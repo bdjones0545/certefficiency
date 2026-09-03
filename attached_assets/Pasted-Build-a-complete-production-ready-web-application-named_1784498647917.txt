@@ -1,0 +1,1055 @@
+Build a complete, production-ready web application named **CertEfficiency** using the attached `design.md` file as the visual source of truth.
+
+The application is a premium certification exam preparation platform centered entirely around a chat interface with an AI tutor named **Sarah**.
+
+The landing page is the product.
+
+Do not build a traditional marketing website. When users open CertEfficiency, they should immediately enter the Sarah chat experience.
+
+Sarah will ultimately run on a private AI agent server connected through a Cloudflare Tunnel. I already have the tunnel credentials and will connect them after the application is built.
+
+Until the real Sarah connection is configured, the entire platform must still be functional using a clearly isolated local development adapter with realistic mocked responses.
+
+Do not directly integrate OpenAI, Anthropic, Claude, Gemini, or another hosted AI provider into the application.
+
+All AI reasoning, question generation, study plans, document interpretation, tutoring, exam grading, and adaptive learning logic will eventually be managed by Sarah through the tunnel.
+
+The frontend and backend should be designed so the mock Sarah adapter can later be replaced with the real tunnel integration without changing the user interface or core application architecture.
+
+# Primary Goal
+
+Deliver a polished, fully functional, deployable application in one implementation.
+
+The application should include:
+
+* Complete frontend
+* Complete backend
+* Database schema
+* Authentication
+* User onboarding
+* Sarah chat interface
+* Conversation persistence
+* Certification selection
+* Study sessions
+* Practice questions
+* Mock exams
+* Progress tracking
+* File uploads
+* Settings
+* Subscription-ready data model
+* Delete account flow
+* Error handling
+* Responsive mobile experience
+* Automated tests
+* Production configuration
+* Secure Sarah integration boundary
+
+Use the attached `design.md` file as the definitive guide for layout, visual hierarchy, spacing, typography, component styling, interaction patterns, and responsive behavior.
+
+Do not redesign the interface unless something in the design is technically impossible. Preserve the intended Apple-style simplicity.
+
+# Technical Stack
+
+Use a reliable modern TypeScript stack compatible with Replit.
+
+Preferred stack:
+
+## Frontend
+
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* Radix UI or shadcn/ui primitives where helpful
+* Wouter or React Router
+* TanStack Query
+* React Hook Form
+* Zod
+* Lucide icons
+
+## Backend
+
+* Node.js
+* Express
+* TypeScript
+* Drizzle ORM
+* PostgreSQL
+* Zod validation
+* Secure session or bearer-token authentication
+* Multer or equivalent secure in-memory upload handling where appropriate
+
+Use PostgreSQL as the source of truth.
+
+Do not store important application data only in localStorage.
+
+LocalStorage may be used only for non-sensitive UI preferences such as:
+
+* Sidebar collapsed state
+* Theme preference
+* Dismissed notices
+
+# Product Architecture
+
+Use the following architecture:
+
+```text
+Browser
+↓
+CertEfficiency React Frontend
+↓
+CertEfficiency Express Backend
+↓
+Sarah Service Adapter
+↓
+Mock Sarah Adapter during development
+or
+Cloudflare Tunnel Adapter in production
+↓
+Private Sarah Agent Runtime
+```
+
+The application must interact with Sarah only through a backend service abstraction.
+
+Create a clean interface such as:
+
+```ts
+interface SarahService {
+  createConversation(input: CreateConversationInput): Promise<CreateConversationResult>;
+  sendMessage(input: SendMessageInput): Promise<SendMessageResult>;
+  streamMessage?(input: SendMessageInput): AsyncIterable<SarahStreamEvent>;
+  submitAnswer(input: SubmitAnswerInput): Promise<SubmitAnswerResult>;
+  startStudyMode(input: StartStudyModeInput): Promise<StartStudyModeResult>;
+  generateStudyPlan(input: GenerateStudyPlanInput): Promise<StudyPlanResult>;
+  startMockExam(input: StartMockExamInput): Promise<MockExamResult>;
+  gradeMockExam(input: GradeMockExamInput): Promise<MockExamGradeResult>;
+  analyzeUpload(input: AnalyzeUploadInput): Promise<AnalyzeUploadResult>;
+}
+```
+
+Create two implementations:
+
+```text
+MockSarahService
+TunnelSarahService
+```
+
+The active implementation must be selected through environment configuration.
+
+Example:
+
+```env
+SARAH_PROVIDER=mock
+SARAH_TUNNEL_URL=
+SARAH_API_KEY=
+SARAH_SIGNING_SECRET=
+```
+
+Do not expose any Sarah credentials to the frontend.
+
+All calls to the tunnel must originate from the backend.
+
+# Tunnel Integration Boundary
+
+Prepare the real integration without requiring the tunnel to be active during the initial build.
+
+Create a production-ready `TunnelSarahService` that supports:
+
+* Configurable tunnel base URL
+* Configurable bearer token or API key
+* Optional HMAC request signing
+* Request timeout
+* Retry handling for transient errors
+* Structured error mapping
+* Correlation IDs
+* Idempotency keys
+* JSON schema validation
+* Safe logging without leaking secrets
+* Health check support
+* Graceful fallback messaging
+* Support for future streaming responses
+
+Use environment variables only.
+
+Never commit credentials.
+
+Provide an `.env.example` file.
+
+Suggested headers:
+
+```text
+Authorization: Bearer <SARAH_API_KEY>
+X-CertEfficiency-Signature: <HMAC_SHA256>
+X-Correlation-ID: <uuid>
+Idempotency-Key: <uuid>
+Content-Type: application/json
+```
+
+Design the adapter so the exact endpoint paths can be changed easily.
+
+Centralize all paths in one configuration file.
+
+# Sarah Request Contract
+
+Use a stable canonical request structure.
+
+Each Sarah request should include relevant context without requiring Sarah to make unnecessary calls back to the application.
+
+Example structure:
+
+```json
+{
+  "requestId": "uuid",
+  "eventType": "message.received",
+  "user": {
+    "id": "uuid"
+  },
+  "certification": {
+    "id": "uuid",
+    "name": "NSCA CSCS",
+    "examDate": "2026-10-01"
+  },
+  "conversation": {
+    "id": "uuid",
+    "mode": "learn"
+  },
+  "message": {
+    "id": "uuid",
+    "content": "Explain periodization."
+  },
+  "context": {
+    "recentMessages": [],
+    "topicMastery": [],
+    "recentAnswers": [],
+    "studyPlan": null,
+    "uploadedResources": []
+  }
+}
+```
+
+Every Sarah response must be normalized and validated before persistence.
+
+Use this pipeline:
+
+```text
+bounded input
+→ canonical schema
+→ structured Sarah output
+→ normalization
+→ validation
+→ transactional versioned persistence
+→ guarded job completion
+→ optional side effects
+→ stable retrieval
+```
+
+Never directly trust an unvalidated Sarah response.
+
+# Authentication
+
+Build complete authentication.
+
+Required features:
+
+* Create account
+* Sign in
+* Sign out
+* Forgot password flow
+* Reset password flow
+* Secure password hashing
+* Session persistence
+* Protected routes
+* Email normalization
+* Rate limiting
+* Account deletion
+* Optional placeholders for Google and Apple sign-in
+
+Google and Apple buttons may be shown but must be labeled as unavailable until credentials are configured unless a proper integration is included.
+
+Do not simulate successful social login.
+
+Allow unauthenticated visitors to begin a temporary chat session.
+
+After meaningful use, prompt them to create an account to preserve progress.
+
+Temporary guest sessions should be safely migratable into a registered account.
+
+# Landing Page and Main Chat
+
+The landing page should match the attached design.
+
+It should immediately show:
+
+* CertEfficiency branding
+* Sarah chat interface
+* Minimal navigation
+* Certification context
+* Message composer
+* Suggested actions
+* Sidebar or mobile drawer
+* Optional study context panel
+
+Use this initial Sarah message:
+
+“Hi, I’m Sarah. I’ll help you prepare for your certification exam by identifying what you know, finding your weak areas, and teaching you how to reason through exam questions.
+
+Which certification are you preparing for?”
+
+Show certification choices including:
+
+* NSCA CSCS
+* NASM-CPT
+* ACSM-EP
+* ACE-CPT
+* PMP
+* CompTIA Security+
+* AWS Certified Solutions Architect
+* Other Certification
+
+The selection must be persisted.
+
+After selection, ask for:
+
+* Planned exam date
+* Weekly study availability
+* Current confidence level
+* Whether they have attempted the exam before
+* Preferred learning style
+
+Sarah controls the conversational flow, but the application must persist all structured onboarding data.
+
+# Chat Functionality
+
+Build a fully functional chat system.
+
+Required:
+
+* New conversation
+* Conversation history
+* Rename conversation
+* Delete conversation
+* Archive conversation
+* Message timestamps
+* User messages
+* Sarah messages
+* Optimistic sending state
+* Typing indicator
+* Streaming-ready architecture
+* Retry failed message
+* Stop response button
+* Suggested prompt chips
+* Scroll restoration
+* Loading skeletons
+* Empty state
+* Mobile keyboard-safe composer
+* Multi-line composer
+* Accessible keyboard behavior
+* Voice input UI placeholder
+* File upload UI
+* Error recovery
+
+The mock adapter should return realistic certification tutoring responses based on the user’s selected certification and study mode.
+
+Mock responses should not be random filler. They should demonstrate:
+
+* Teaching explanations
+* Exam-style reasoning
+* Question cards
+* Feedback
+* Progress updates
+* Study recommendations
+* Mock exam setup
+
+# Structured Message Types
+
+Do not treat every Sarah response as plain markdown.
+
+Support structured chat message types:
+
+```text
+text
+system_notice
+certification_selector
+exam_date_prompt
+quick_actions
+question_card
+answer_feedback
+progress_update
+study_plan
+mock_exam_intro
+mock_exam_result
+upload_analysis
+error
+```
+
+Define discriminated Zod schemas for every message type.
+
+Persist both:
+
+* Raw normalized payload
+* Rendered message data
+
+The UI should render each structured message as a native interactive component.
+
+# Practice Questions
+
+Create interactive practice question cards inside the conversation.
+
+Each question must support:
+
+* Question ID
+* Certification
+* Domain
+* Topic
+* Difficulty
+* Prompt
+* Four answer options
+* Selected answer
+* Confidence level
+* Submit button
+* Flag question
+* Correct answer
+* Explanation
+* Explanation for each incorrect option
+* Exam reasoning strategy
+* Mastery impact
+* Next question action
+
+Answers must be persisted.
+
+The backend should prevent duplicate submissions unless explicitly allowed.
+
+Use transactions when saving:
+
+* Submitted answer
+* Feedback
+* Mastery update
+* Progress event
+
+# Study Modes
+
+Support these study modes:
+
+* Learn
+* Practice
+* Review
+* Mock Exam
+* Study Plan
+
+Users should be able to switch modes through the UI.
+
+Persist the current mode per conversation.
+
+Sarah will ultimately control the content for each mode.
+
+The application must control:
+
+* Mode state
+* Timers
+* User input
+* Persistence
+* Progress records
+* Navigation
+* Submission state
+* Validation
+* Error recovery
+
+# Mock Exams
+
+Build a complete mock exam experience.
+
+Required:
+
+* Start exam
+* Configurable question count
+* Optional time limit
+* Exam timer
+* Question navigation
+* Previous and next question
+* Flag question
+* Save answers
+* Autosave
+* Submit confirmation
+* Prevent accidental loss
+* Results screen
+* Domain breakdown
+* Correct and incorrect counts
+* Time used
+* Readiness update
+* Review incorrect answers
+* Resume interrupted exam
+
+Sarah will provide or validate exam content later.
+
+The mock adapter should create realistic sample questions.
+
+# Study Plans
+
+Build study plan functionality.
+
+Required fields:
+
+* Certification
+* Exam date
+* Days remaining
+* Weekly availability
+* Preferred study days
+* Session duration
+* Weak domains
+* Strong domains
+* Recommended weekly schedule
+* Milestones
+* Review dates
+* Mock exam dates
+
+Allow users to:
+
+* Generate plan
+* View plan
+* Edit availability
+* Mark sessions complete
+* Regenerate plan
+* Track adherence
+
+Sarah will generate the plan content through the backend adapter.
+
+# Progress and Mastery
+
+Create a progress model that supports:
+
+* Overall readiness score
+* Domain mastery
+* Topic mastery
+* Questions answered
+* Accuracy
+* Confidence
+* Study streak
+* Time studied
+* Completed sessions
+* Mock exam scores
+* Weak areas
+* Strong areas
+* Recent progress events
+
+Display progress naturally in:
+
+* Chat progress cards
+* Sidebar
+* Study context panel
+* Settings or progress view
+
+Do not create an overly complex dashboard that conflicts with the attached design.
+
+# File Uploads
+
+Support uploads for:
+
+* PDF
+* DOCX
+* TXT
+* Markdown
+* Images
+* Notes
+
+Apply:
+
+* Authentication checks
+* MIME allowlist
+* File-size limits
+* Safe filename handling
+* Malware-aware architecture
+* No executable file support
+* Clear error messages
+* Upload progress
+* Delete uploaded file
+* Attachment metadata
+* Ownership checks
+
+Do not permanently store file contents in the database.
+
+Store metadata and use a proper file storage abstraction.
+
+For development, a local storage adapter is acceptable.
+
+Create an interface so cloud object storage can be added later.
+
+The mock Sarah adapter should acknowledge uploads and provide a simulated structured analysis response.
+
+# Database Schema
+
+Create normalized tables for at least:
+
+```text
+users
+sessions
+guest_sessions
+password_reset_tokens
+user_preferences
+certifications
+user_certifications
+conversations
+messages
+message_versions
+study_sessions
+practice_questions
+practice_attempts
+mock_exams
+mock_exam_questions
+mock_exam_attempts
+study_plans
+study_plan_items
+topic_mastery
+progress_events
+uploads
+sarah_jobs
+sarah_job_attempts
+audit_events
+subscriptions
+```
+
+Use:
+
+* UUID primary keys
+* Created and updated timestamps
+* Foreign keys
+* Useful indexes
+* Unique constraints
+* Soft deletion where appropriate
+* Organization-ready architecture where practical
+* Transactional writes
+* Versioning for generated content
+
+Create and run database migrations.
+
+Seed the certification table with several examples.
+
+# Sarah Jobs
+
+All non-trivial Sarah requests should use a reusable generation job system.
+
+Each job should include:
+
+* ID
+* User ID
+* Conversation ID
+* Request type
+* Status
+* Idempotency key
+* Attempt count
+* Input payload
+* Output payload
+* Error code
+* Error message
+* Started timestamp
+* Completed timestamp
+* Correlation ID
+
+Statuses:
+
+```text
+queued
+processing
+completed
+failed
+cancelled
+```
+
+Prevent duplicate completion.
+
+Use transactional persistence.
+
+Support retry of failed jobs.
+
+Expose safe status endpoints to the frontend.
+
+# API Routes
+
+Create REST endpoints with consistent response formats.
+
+Suggested routes:
+
+```text
+POST   /api/auth/register
+POST   /api/auth/login
+POST   /api/auth/logout
+POST   /api/auth/forgot-password
+POST   /api/auth/reset-password
+GET    /api/auth/me
+
+GET    /api/certifications
+POST   /api/user-certifications
+PATCH  /api/user-certifications/:id
+
+GET    /api/conversations
+POST   /api/conversations
+GET    /api/conversations/:id
+PATCH  /api/conversations/:id
+DELETE /api/conversations/:id
+
+POST   /api/conversations/:id/messages
+GET    /api/conversations/:id/messages
+POST   /api/messages/:id/retry
+
+POST   /api/study-modes/start
+POST   /api/practice/:questionId/answer
+
+POST   /api/mock-exams
+GET    /api/mock-exams/:id
+PATCH  /api/mock-exams/:id/answers
+POST   /api/mock-exams/:id/submit
+
+POST   /api/study-plans
+GET    /api/study-plans/current
+PATCH  /api/study-plans/:id
+
+GET    /api/progress
+GET    /api/progress/domains
+GET    /api/progress/events
+
+POST   /api/uploads
+GET    /api/uploads
+DELETE /api/uploads/:id
+
+GET    /api/settings
+PATCH  /api/settings
+DELETE /api/account
+
+GET    /api/sarah/health
+GET    /api/sarah/jobs/:id
+POST   /api/sarah/jobs/:id/retry
+```
+
+All routes must use:
+
+* Authentication where required
+* Zod input validation
+* Ownership checks
+* Standard error responses
+* Rate limiting
+* Request IDs
+* Safe logging
+
+# Settings
+
+Build a fully functional settings panel.
+
+Include:
+
+* Profile
+* Name
+* Email
+* Password change
+* Selected certification
+* Exam date
+* Weekly study availability
+* Preferred learning style
+* Notifications
+* Theme
+* Voice settings placeholder
+* Subscription
+* Privacy
+* Data export placeholder
+* Sign out
+* Delete account
+
+Delete account must:
+
+* Require password confirmation or a strong confirmation phrase
+* Explain what will be deleted
+* Revoke active sessions
+* Remove or anonymize data according to the chosen implementation
+* Delete owned uploads
+* Write an audit event
+* Return the user to the initial guest experience
+
+# Subscription Readiness
+
+Do not require payment integration for the first build unless credentials are already present.
+
+Create a subscription-ready schema and UI state.
+
+Support plans such as:
+
+```text
+guest
+free
+pro
+```
+
+Feature-gating infrastructure should exist but remain simple.
+
+Do not block the core application during development.
+
+# Logo and Branding
+
+Create the CertEfficiency logo based on the visual direction in `design.md`.
+
+The logo should be:
+
+* Minimal
+* Geometric
+* Original
+* Easy to recognize
+* Suitable for favicon use
+* Suitable for light and dark mode
+* Free of generic robot imagery
+* Free of generic graduation-cap imagery
+
+A strong direction is a compact mark combining:
+
+* A letter C
+* A subtle checkmark
+* A sense of forward progress
+
+Implement:
+
+* Full wordmark
+* Compact mark
+* Browser favicon
+* App metadata icon
+* Open Graph placeholder image or branded share card
+
+Use SVG wherever possible.
+
+# Responsive Design
+
+The interface must work well on:
+
+* Desktop
+* Laptop
+* Tablet
+* Mobile
+* Small mobile screens
+
+Mobile requirements:
+
+* Full-screen chat
+* Drawer navigation
+* Bottom-sheet study context
+* Safe-area support
+* Keyboard-safe composer
+* Touch-friendly controls
+* No horizontal overflow
+* Native-feeling transitions
+
+# Accessibility
+
+Meet a strong WCAG standard.
+
+Include:
+
+* Semantic HTML
+* Keyboard navigation
+* Proper focus handling
+* Visible focus states
+* Screen-reader labels
+* Sufficient color contrast
+* Reduced-motion support
+* Accessible dialogs
+* Accessible forms
+* Accessible question answer controls
+* Accessible timer announcements
+
+# Security
+
+Implement:
+
+* Password hashing
+* Secure cookies or secure bearer sessions
+* CSRF protection where relevant
+* Rate limiting
+* Ownership checks
+* Input validation
+* Secure headers
+* CORS restrictions
+* File upload restrictions
+* Secret isolation
+* SQL injection protection through ORM
+* XSS-safe rendering
+* Markdown sanitization
+* Audit logging
+* No secrets in browser bundles
+* No stack traces in production responses
+
+Do not log:
+
+* Passwords
+* Session tokens
+* Sarah API keys
+* Signing secrets
+* Full uploaded documents
+* Sensitive personal information
+
+# Error Handling
+
+Create user-friendly error states.
+
+Examples:
+
+* “Sarah couldn’t complete that response. Please try again.”
+* “Your message was saved, but Sarah is temporarily unavailable.”
+* “This file type isn’t supported.”
+* “Your session expired. Please sign in again.”
+* “We couldn’t save your answer. Try again.”
+
+Provide retry actions where appropriate.
+
+Never show raw backend errors to users.
+
+# Development Mock Behavior
+
+The app must be usable before the real tunnel is connected.
+
+`MockSarahService` should support realistic flows:
+
+1. Certification selection
+2. Exam date selection
+3. Initial readiness questions
+4. Study plan preview
+5. Topic explanation
+6. Practice question generation
+7. Answer feedback
+8. Mastery updates
+9. Mock exam creation
+10. Upload analysis acknowledgment
+
+Make mock behavior deterministic enough for automated testing.
+
+Clearly isolate mock data from production logic.
+
+# Testing
+
+Create comprehensive automated tests.
+
+Required coverage:
+
+* Authentication
+* Protected routes
+* Conversation creation
+* Message sending
+* Sarah job lifecycle
+* Practice question submissions
+* Duplicate submission protection
+* Mock exam autosave
+* Mock exam submission
+* Study plan persistence
+* Progress updates
+* Upload restrictions
+* Account deletion
+* Tunnel adapter validation
+* HMAC signing
+* Retry handling
+* Authorization and ownership isolation
+
+Use unit and integration tests.
+
+Add frontend component tests for important interactive states.
+
+All tests must pass before completion.
+
+# Developer Documentation
+
+Create:
+
+* `README.md`
+* `.env.example`
+* Architecture overview
+* Database setup instructions
+* Replit run instructions
+* Migration instructions
+* Test instructions
+* Deployment instructions
+* Sarah tunnel integration instructions
+* Environment variable documentation
+* API contract documentation
+* Troubleshooting section
+
+Include a dedicated section titled:
+
+```text
+Connecting the Real Sarah Agent
+```
+
+Explain exactly where I will insert:
+
+* Tunnel URL
+* Sarah API key
+* Signing secret
+* Provider mode
+
+Document how to switch:
+
+```env
+SARAH_PROVIDER=mock
+```
+
+to:
+
+```env
+SARAH_PROVIDER=tunnel
+```
+
+# Production Health Checks
+
+Create endpoints:
+
+```text
+GET /api/health
+GET /api/health/database
+GET /api/sarah/health
+```
+
+The main health route must not leak secrets.
+
+# Completion Standard
+
+Do not stop after creating mock screens.
+
+Do not leave major buttons non-functional.
+
+Do not create a frontend-only prototype.
+
+Do not create placeholder pages disconnected from the backend.
+
+Do not integrate a different AI provider as a shortcut.
+
+Build the application end to end.
+
+Before considering the task complete:
+
+1. Run database migrations.
+2. Seed certification data.
+3. Run TypeScript checks.
+4. Run linting.
+5. Run the full test suite.
+6. Fix all failures.
+7. Verify registration and sign-in.
+8. Verify guest chat.
+9. Verify registered chat persistence.
+10. Verify practice questions.
+11. Verify mock exam flow.
+12. Verify file upload validation.
+13. Verify settings.
+14. Verify delete account.
+15. Verify mobile responsiveness.
+16. Verify the mock Sarah adapter.
+17. Verify the tunnel adapter configuration fails safely when credentials are missing.
+18. Confirm the application starts correctly in Replit.
+
+At completion, provide a concise implementation report including:
+
+* What was built
+* Architecture used
+* Database tables created
+* Routes created
+* Tests passing
+* Environment variables required
+* Exact steps to connect the Cloudflare Tunnel to Sarah
+* Any limitations that remain
+
+The application should feel like a premium native Apple product built around an elite AI certification tutor.
+
+The chat is the primary interface.
+
+Sarah manages the intelligence.
+
+CertEfficiency manages the secure product experience, user data, persistence, assessments, progress, and interaction layer.

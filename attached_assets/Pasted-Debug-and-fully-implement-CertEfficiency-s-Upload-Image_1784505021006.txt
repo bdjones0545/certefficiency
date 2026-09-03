@@ -1,0 +1,436 @@
+Debug and fully implement CertEfficiency’s **Upload Image** feature. Clicking Upload Image currently appears to do nothing.
+
+The feature must support this complete flow:
+
+```text
+Click Upload Image
+→ operating-system file picker opens
+→ user selects an image
+→ client validates file
+→ preview appears in composer
+→ file uploads to CertEfficiency
+→ attachment record is created
+→ user sends the message
+→ message and attachment are persisted
+→ Sarah receives the image reference and user prompt
+→ Sarah’s response is displayed
+```
+
+## 1. Diagnose the current button
+
+Trace and log:
+
+```text
+image_upload_clicked
+file_picker_opened
+file_selected
+file_validation_started
+file_validation_completed
+upload_started
+upload_completed
+attachment_created
+message_send_started
+sarah_image_dispatch_started
+sarah_image_dispatch_completed
+```
+
+Determine:
+
+* Whether the Upload Image button has an `onClick`
+* Whether a hidden `<input type="file">` exists
+* Whether the button calls `fileInputRef.current?.click()`
+* Whether the file input has an `onChange`
+* Whether the input accepts images
+* Whether the selected file is stored in React state
+* Whether the same file can be selected twice
+* Whether an upload request appears in the browser Network panel
+* Whether an upload endpoint exists on the API server
+* Whether the request uses `multipart/form-data`
+* Whether the frontend incorrectly sets the multipart `Content-Type` manually
+* Whether errors are silently swallowed
+* Whether attachment state is cleared during rerenders
+
+Do not stop after finding the first issue. Verify the entire upload-to-Sarah path.
+
+## 2. Frontend file-picker implementation
+
+Use a hidden input controlled by a ref:
+
+```tsx
+const imageInputRef = useRef<HTMLInputElement>(null);
+
+<input
+  ref={imageInputRef}
+  type="file"
+  accept="image/jpeg,image/png,image/webp,image/gif"
+  className="hidden"
+  onChange={handleImageSelected}
+/>
+
+<button
+  type="button"
+  onClick={() => imageInputRef.current?.click()}
+  disabled={uploadImage.isPending || sendMsg.isPending}
+>
+  Upload Image
+</button>
+```
+
+The button must have `type="button"` so it does not accidentally submit the composer form.
+
+After handling the selection, reset the file input:
+
+```ts
+event.target.value = "";
+```
+
+This allows the same image to be selected again later.
+
+## 3. Client-side validation
+
+Accept only:
+
+```text
+image/jpeg
+image/png
+image/webp
+image/gif
+```
+
+Apply a configurable file-size limit. Use 10 MB unless the current product specification defines another limit.
+
+Show a visible error for:
+
+* unsupported format
+* oversized file
+* empty file
+* failed upload
+* malformed upload response
+* network timeout
+
+Do not silently ignore invalid files.
+
+## 4. Preview and composer state
+
+After selection, show an attachment preview inside the composer containing:
+
+* image thumbnail
+* filename
+* upload progress or status
+* remove button
+* error state when relevant
+
+Suggested state model:
+
+```ts
+type PendingImage = {
+  localId: string;
+  file: File;
+  previewUrl: string;
+  status: "selected" | "uploading" | "uploaded" | "failed";
+  attachmentId?: string;
+  error?: string;
+};
+```
+
+Revoke preview object URLs when files are removed or the component unmounts:
+
+```ts
+URL.revokeObjectURL(previewUrl);
+```
+
+Do not clear the selected image merely because the component rerenders.
+
+## 5. Backend upload endpoint
+
+Implement or verify:
+
+```text
+POST /api/uploads/images
+```
+
+The endpoint must:
+
+1. Require authentication.
+2. Parse one multipart image.
+3. Enforce MIME allowlisting.
+4. Enforce file-size limits.
+5. Validate that the bytes correspond to a real supported image.
+6. Generate a server-controlled filename or object key.
+7. Store the image in the configured durable storage system.
+8. Create an attachment database record.
+9. Return canonical attachment metadata.
+
+Example response:
+
+```json
+{
+  "attachment": {
+    "id": "attachment-id",
+    "kind": "image",
+    "mimeType": "image/jpeg",
+    "filename": "original-name.jpg",
+    "sizeBytes": 248193,
+    "width": 1200,
+    "height": 800,
+    "status": "ready"
+  }
+}
+```
+
+Do not return a local filesystem path to the browser.
+
+Do not trust the user-provided filename or MIME type by itself.
+
+## 6. Multipart request correctness
+
+Use `FormData`:
+
+```ts
+const formData = new FormData();
+formData.append("image", file);
+
+const response = await fetch("/api/uploads/images", {
+  method: "POST",
+  body: formData,
+});
+```
+
+Do not manually set:
+
+```text
+Content-Type: multipart/form-data
+```
+
+The browser must add the multipart boundary automatically.
+
+Confirm global fetch wrappers do not incorrectly force:
+
+```text
+Content-Type: application/json
+```
+
+onto FormData requests. If a shared API client does that, update it so JSON headers are only added when the request body is JSON.
+
+This is a likely root cause if clicking the button opens the picker but uploading still fails.
+
+## 7. Message attachment persistence
+
+Update:
+
+```text
+POST /api/conversations/:conversationId/messages
+```
+
+to accept attachment IDs:
+
+```json
+{
+  "content": "Can you explain what is shown in this image?",
+  "attachmentIds": ["attachment-id"]
+}
+```
+
+Validate that:
+
+* each attachment belongs to the authenticated user or organization
+* each attachment is in `ready` status
+* each attachment is an allowed type
+* attachments cannot be reused across unauthorized conversations
+* the message and attachment relationship is persisted transactionally
+
+Do not include base64 image data in the message table.
+
+## 8. Sarah image contract
+
+After the local message and attachment relationship are persisted, dispatch a normalized request to Sarah.
+
+Use a structure similar to:
+
+```json
+{
+  "requestId": "unique-request-id",
+  "conversationId": "conversation-id",
+  "message": {
+    "type": "user_message",
+    "content": "Can you explain what is shown in this image?"
+  },
+  "attachments": [
+    {
+      "id": "attachment-id",
+      "type": "image",
+      "mimeType": "image/jpeg",
+      "filename": "original-name.jpg",
+      "url": "temporary-authorized-url"
+    }
+  ]
+}
+```
+
+Confirm Sarah’s API contract before finalizing the field names.
+
+If Sarah cannot currently consume image attachments, report that explicitly and implement the CertEfficiency upload and message persistence layers anyway. Do not fake successful visual analysis.
+
+## 9. Secure image access for Sarah
+
+Sarah runs on a separate VM, so she cannot access a browser-only blob URL or Replit local path.
+
+Provide one of:
+
+* a short-lived signed download URL
+* an authenticated internal attachment endpoint
+* a controlled server-to-server file transfer
+
+Preferred approach:
+
+```text
+short-lived signed URL
+```
+
+Requirements:
+
+* expires within a reasonable period, such as 5–15 minutes
+* grants access only to the single attachment
+* is generated server-side
+* is never permanently public
+* is not stored as the canonical permanent URL in the database
+
+Do not send Sarah:
+
+```text
+blob:http://...
+/tmp/upload...
+C:\fakepath\...
+```
+
+## 10. Upload independently from Send
+
+Uploading and sending should be separate states.
+
+The user must be able to:
+
+* select an image
+* wait for upload completion
+* add text
+* remove the image
+* send once the attachment is ready
+
+Disable Send only when:
+
+* an attachment is actively uploading
+* the message send mutation is pending
+* a required attachment upload failed
+
+Do not disable New Chat because an image is uploading in another conversation.
+
+## 11. Empty-text image messages
+
+Allow an image-only message when at least one valid uploaded attachment exists.
+
+Validation should be:
+
+```ts
+const canSend =
+  content.trim().length > 0 ||
+  uploadedAttachments.length > 0;
+```
+
+Do not require text when an image is attached.
+
+## 12. Failure behavior
+
+If the upload fails:
+
+* keep the composer open
+* show a visible retry option
+* do not create a broken message
+* do not clear the user’s typed text
+* do not permanently disable the composer
+
+If Sarah analysis fails after the local message is saved:
+
+* preserve the user message and image
+* mark the Sarah job as failed
+* show the failure in the conversation
+* allow retry
+* do not upload the image again unnecessarily
+
+## 13. Logging
+
+Add safe structured logs:
+
+```text
+image_upload_route_entered
+image_upload_validated
+image_storage_started
+image_storage_completed
+attachment_record_created
+message_attachment_linked
+sarah_attachment_url_created
+sarah_image_dispatch_started
+sarah_image_dispatch_completed
+sarah_image_dispatch_failed
+```
+
+Include:
+
+* request ID
+* user ID or organization ID
+* conversation ID
+* attachment ID
+* MIME type
+* size
+* duration
+
+Do not log image bytes, signed URLs, bearer tokens, signing secrets, or full private message content.
+
+## 14. Tests
+
+Add tests for:
+
+1. Clicking Upload Image opens the file picker.
+2. Selecting a JPEG creates a preview.
+3. PNG and WebP uploads succeed.
+4. Unsupported file types are rejected.
+5. Oversized files are rejected.
+6. The same file can be selected twice.
+7. The shared API client does not attach a JSON content type to FormData.
+8. Upload failure appears visibly.
+9. Removing a pending image clears it correctly.
+10. An image-only message can be sent.
+11. A text-plus-image message can be sent.
+12. Attachment ownership is enforced.
+13. A local image path is never sent to Sarah.
+14. Sarah receives an authorized image reference.
+15. Sarah timeout does not remove the user’s message.
+16. A failed Sarah job can be retried.
+17. Upload state from one conversation does not leak into another.
+18. New Chat remains functional after an upload failure.
+
+## Completion criteria
+
+The task is complete when:
+
+* clicking Upload Image always opens the native file picker
+* a selected image immediately displays a preview
+* the upload request succeeds and creates an attachment
+* Send accepts image-only and image-plus-text messages
+* the image appears in the user’s chat message
+* Sarah receives a valid accessible image reference
+* Sarah’s response appears in the chat
+* all failures are visible and recoverable
+* no raw image data is stored in the message JSON
+* no local filesystem path or blob URL is sent to Sarah
+
+Return:
+
+* exact root cause
+* frontend files changed
+* backend files changed
+* upload endpoint used
+* storage method
+* maximum file size
+* Sarah attachment request shape
+* browser request status
+* final end-to-end test result
+* full test count

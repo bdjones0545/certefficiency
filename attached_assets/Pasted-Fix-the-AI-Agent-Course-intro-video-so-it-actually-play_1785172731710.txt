@@ -1,0 +1,254 @@
+Fix the AI Agent Course intro video so it actually plays in the deployed Replit application.
+
+## Current symptom
+
+The intro video was uploaded directly into the Replit project.
+
+The video player renders on the page, but:
+
+* the video does not start
+* no playable content appears
+* the player may remain blank or stuck
+* the controls may render without playback
+
+Do not replace the video or migrate it to Cloudflare R2 yet. First diagnose and repair playback for the existing Replit-hosted video asset.
+
+## 1. Identify the actual video asset
+
+Locate the uploaded intro video in the project.
+
+Report:
+
+* exact filename
+* file extension
+* file size
+* current filesystem location
+* current URL used by the frontend
+* component rendering the video
+* whether the asset is bundled, copied to a public directory, or served through an API route
+
+Do not assume a filesystem path is automatically a browser-accessible URL.
+
+## 2. Verify browser accessibility
+
+Open the exact video URL directly in the deployed application.
+
+Confirm:
+
+* HTTP status is `200`
+* response is the actual video bytes
+* response is not HTML
+* response is not a React fallback page
+* response is not a login page
+* response is not a `404`
+* response is not a redirect loop
+
+Inspect these headers:
+
+```text
+Content-Type
+Content-Length
+Accept-Ranges
+Content-Range
+Cache-Control
+```
+
+For an MP4, the response should normally use:
+
+```text
+Content-Type: video/mp4
+```
+
+The server should support byte-range requests so the browser can seek and begin playback correctly.
+
+## 3. Fix the asset path
+
+If this is a frontend static asset, place it in the framework’s correct public/static directory.
+
+The browser source should use a public URL such as:
+
+```tsx
+<video controls preload="metadata">
+  <source src="/videos/ai-agent-course-intro.mp4" type="video/mp4" />
+</video>
+```
+
+Do not use local filesystem paths such as:
+
+```text
+/home/runner/...
+attached_assets/...
+src/assets/...
+file://...
+```
+
+unless the build system explicitly imports and bundles the asset correctly.
+
+If the asset is imported through the build system, confirm that the deployed build emits a valid hashed public URL.
+
+## 4. Inspect the video component
+
+Use a native HTML5 video element unless the application has a deliberate custom player requirement.
+
+Recommended structure:
+
+```tsx
+<video
+  controls
+  playsInline
+  preload="metadata"
+  className="w-full rounded-lg"
+>
+  <source
+    src="/videos/ai-agent-course-intro.mp4"
+    type="video/mp4"
+  />
+  Your browser does not support HTML5 video.
+</video>
+```
+
+Do not require autoplay for basic playback.
+
+If autoplay is desired, browsers generally require the video to begin muted:
+
+```tsx
+autoPlay
+muted
+playsInline
+```
+
+Ensure no transparent overlay, loading screen, modal layer, or pointer-events styling blocks the controls.
+
+## 5. Validate the media codec
+
+Inspect the file with `ffprobe` or an equivalent installed tool.
+
+Confirm the video uses browser-compatible codecs, preferably:
+
+```text
+Video: H.264
+Audio: AAC
+Container: MP4
+Pixel format: yuv420p
+```
+
+A file ending in `.mp4` is not necessarily browser-compatible.
+
+If the current codecs are incompatible, transcode a copy using a production-safe command equivalent to:
+
+```bash
+ffmpeg -i input.mp4 \
+  -c:v libx264 \
+  -profile:v high \
+  -pix_fmt yuv420p \
+  -movflags +faststart \
+  -c:a aac \
+  -b:a 128k \
+  output.mp4
+```
+
+Use `-movflags +faststart` so the MP4 metadata is placed at the beginning of the file and playback can start before the full file downloads.
+
+Preserve the original file until the converted copy is verified.
+
+## 6. Inspect runtime errors
+
+Check the deployed browser console and network panel for:
+
+```text
+MEDIA_ERR_SRC_NOT_SUPPORTED
+DEMUXER_ERROR
+PIPELINE_ERROR
+404
+403
+416
+CORS
+Content-Type
+Range
+Failed to load resource
+```
+
+Add temporary video event logging for:
+
+```tsx
+onLoadedMetadata
+onCanPlay
+onPlay
+onPause
+onError
+onStalled
+onWaiting
+```
+
+Log only safe diagnostic values such as:
+
+* current source URL
+* media error code
+* readyState
+* networkState
+* duration
+
+Remove noisy temporary logging after the issue is confirmed fixed.
+
+## 7. Handle large files correctly
+
+Determine whether the uploaded file is too large or unreliable for Replit static hosting.
+
+Do not immediately migrate it, but report:
+
+* deployed file size
+* initial response time
+* whether range requests work
+* whether the file survives build and deployment
+* whether Replit excludes or truncates the asset
+
+If the file cannot be reliably served from Replit, return a clear recommendation to move the video to the existing Cloudflare R2 `aiagentcourse` bucket.
+
+## 8. Required user-facing behavior
+
+After the fix:
+
+* the intro video visibly loads
+* the poster or first frame appears
+* clicking Play starts video and audio
+* controls work
+* playback works after refresh
+* playback works in the deployed application, not only development
+* playback works on desktop and mobile
+* an understandable fallback message appears if loading fails
+* the page never shows an infinite loading state
+
+## 9. Acceptance test
+
+Test the deployed application with:
+
+1. A hard refresh
+2. Direct opening of the video URL
+3. Play from the beginning
+4. Pause and resume
+5. Seek to the middle
+6. Mobile viewport playback
+7. Safari or WebKit-compatible playback
+8. Chrome-compatible playback
+
+Return:
+
+* root cause
+* exact file path
+* exact public URL
+* MIME type
+* codec details
+* whether byte ranges work
+* files changed
+* deployed playback result
+
+Use exactly one verdict:
+
+```text
+FIXED — DEPLOYED VIDEO VERIFIED
+BLOCKED — VIDEO CODEC INCOMPATIBLE
+BLOCKED — STATIC ASSET NOT DEPLOYED
+BLOCKED — REPLIT VIDEO HOSTING UNSUITABLE
+```
+
+Do not return `FIXED` unless the intro video visibly plays in the deployed course application.

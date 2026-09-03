@@ -1,0 +1,248 @@
+Review and correct the production audit conclusions after the test-harness fixes.
+
+The 97/97 passing result is accepted, but passing mocked tests does not complete the requested Replit → Cloudflare Tunnel → Hermes → Sarah production audit.
+
+## First: separate the scopes
+
+Update `artifacts/api-server/AUDIT-REPORT.md` so it clearly distinguishes:
+
+### Sarah integration blockers
+
+Issues that directly affect:
+
+```text
+CertEfficiency
+→ Replit backend
+→ Cloudflare Tunnel
+→ Hermes
+→ Sarah
+→ Replit
+→ frontend
+```
+
+### Course and R2 blockers
+
+Issues affecting AI Agent Course video playback but not Sarah connectivity.
+
+Do not combine R2 video configuration with the production-readiness classification of the Sarah integration.
+
+---
+
+## Reconcile potentially stale findings
+
+The report currently lists “lessons 4–10 video URLs” as a production blocker.
+
+The current database and integration work previously established:
+
+* 11 total lesson records
+* all 11 lessons have `video_object_key`
+* lessons use R2 object keys
+* signed playback endpoints resolve the object key server-side
+* permanent public video URLs should not be required
+
+Inspect the current repository and database behavior.
+
+Determine whether:
+
+1. Lessons 4–10 are missing `video_object_key`.
+2. A frontend component still requires legacy `video_url`.
+3. An API response still prioritizes the wrong field.
+4. The audit statement is stale.
+5. The player cannot resolve lessons 4–10 for another concrete reason.
+
+Report the exact code path and database evidence.
+
+If the finding is stale, remove it from the blockers.
+
+If a legacy dependency exists, fix it without making the bucket public or storing presigned URLs.
+
+---
+
+## Verify the actual Sarah production path
+
+Now perform the live or deploy-environment checks that mocked tests cannot prove.
+
+At minimum verify:
+
+1. The deployed Replit backend resolves the production Hermes hostname.
+2. The hostname is HTTPS and uses the intended Cloudflare Tunnel.
+3. The Replit server can reach the Hermes health endpoint.
+4. An unsigned or incorrectly signed request is rejected.
+5. A valid signed request is accepted.
+6. The Sarah profile is available.
+7. Sarah identifies herself correctly.
+8. A dedicated synthetic test user can create a conversation.
+9. The first user message reaches Sarah.
+10. Sarah returns a valid response.
+11. The user message and Sarah response are persisted.
+12. Reloading the conversation returns both messages in order.
+13. A second message retains the intended conversation context.
+14. A new conversation does not inherit private context from the first.
+15. Repeating an idempotent request does not duplicate the message or response.
+16. A different user cannot read the synthetic test conversation.
+17. Correlation IDs can trace the request through the full path.
+18. A Hermes timeout produces a recoverable frontend state.
+19. The user’s draft is preserved on failure.
+20. The service returns to healthy status after connectivity is restored.
+
+Use an isolated synthetic user or test tenant. Do not modify real user conversations.
+
+---
+
+## Validate production configuration
+
+Inspect the actual production configuration for Sarah and report each required environment variable as:
+
+* present
+* missing
+* safe default
+* unsafe default
+* server-only
+* exposed to browser
+* startup validated
+* readiness validated
+
+Include the actual variable names found in the repository.
+
+Explicitly verify:
+
+* Hermes base URL
+* Sarah route or profile identifier
+* HMAC or bearer secret
+* signature timestamp or replay settings
+* request timeout
+* retry configuration
+* callback configuration, if applicable
+* `ALLOWED_ORIGINS`
+
+Production must fail closed or report degraded readiness when Sarah is unavailable.
+
+Do not log secret values.
+
+---
+
+## Inspect live authentication behavior
+
+Document the exact request-signing contract:
+
+* canonical payload
+* signature algorithm
+* signed headers
+* timestamp format
+* replay window
+* nonce or idempotency field
+* timing-safe comparison
+* secret rotation approach
+
+Test:
+
+* missing signature
+* malformed signature
+* expired timestamp
+* replayed valid request
+* correct signature
+* wrong secret
+* modified body after signing
+
+Provide status codes and safe error codes for each result.
+
+---
+
+## Inspect operational persistence
+
+Where Replit cannot inspect the VM automatically, mark the requirement `Unable to Verify` and list the exact command or evidence needed from the VM.
+
+Required VM evidence includes:
+
+* Hermes service manager definition
+* process restart policy
+* enabled-at-boot status
+* Sarah profile path
+* profile load status
+* tunnel service definition
+* tunnel restart policy
+* enabled-at-boot status
+* active production hostname
+* origin bind address
+* log rotation
+* disk usage controls
+* last restart result
+* successful Sarah request after restart
+
+Do not mark these passed without evidence.
+
+---
+
+## Failure-injection checks
+
+Perform safe failure tests for:
+
+* Hermes 500
+* Hermes 429
+* Hermes timeout
+* malformed Hermes JSON
+* missing Sarah profile
+* connection reset
+* duplicate request
+* two-tab simultaneous send
+* database failure before persistence
+* database failure after dispatch
+* frontend disconnect after server acceptance
+
+For each, report:
+
+* user-visible result
+* persistence result
+* retry behavior
+* duplication result
+* correlation ID
+* recovery behavior
+
+---
+
+## Required final classification
+
+Use one exact classification:
+
+```text
+Production Ready
+Production Ready With Minor Risks
+Not Production Ready
+Unable to Verify
+```
+
+Do not classify as Production Ready based only on 97 passing mocked tests.
+
+A Production Ready classification requires live evidence of:
+
+* deployed conversation creation
+* deployed Sarah response
+* correct Sarah identity
+* request authentication
+* response persistence
+* tenant isolation
+* idempotency
+* timeout recovery
+* health degradation and restoration
+* operational restart behavior
+
+## Updated report
+
+Update `artifacts/api-server/AUDIT-REPORT.md` with:
+
+1. Corrected scope separation
+2. Corrected R2 and lesson findings
+3. Automated test evidence
+4. Live Sarah smoke-test evidence
+5. Authentication test results
+6. Tenant-isolation results
+7. Failure-injection results
+8. Production environment status
+9. VM-side verified and unverified requirements
+10. Blocking risks
+11. Minor risks
+12. Exact remediation steps
+13. Final classification
+14. Evidence required to upgrade the classification
+
+Preserve the original findings in an audit-history section so the corrections do not conceal what was initially reported.

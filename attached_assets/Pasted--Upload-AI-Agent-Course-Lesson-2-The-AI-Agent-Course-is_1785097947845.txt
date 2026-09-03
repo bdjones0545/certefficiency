@@ -1,0 +1,96 @@
+# Upload AI Agent Course Lesson 2
+
+The AI Agent Course is already built and live at `/course`.
+
+I am now uploading the completed video for **Lesson 2**.
+
+Do not rebuild or redesign the course platform. Do not create a new course, lesson, Stripe product, or price.
+
+## Lesson Details
+
+* Course: **How to Build an AI Agent**
+* Course slug: `ai-agent-builder`
+* Lesson number: **2**
+* Lesson title: **Planning Your AI Worker**
+* Access: **Paid**
+* Required enrollment: Confirmed purchase of the AI Agent Course
+
+## Task
+
+Take the attached video file and connect it to the existing Lesson 2 record in `platform_lessons`.
+
+Replace the current Lesson 2 placeholder with the uploaded video.
+
+Use the platform’s existing file-storage or object-storage system. Do not commit the video file directly into the repository unless no secure storage option exists.
+
+## Required Behavior
+
+* Lesson 2 must remain locked for users who have not purchased the course.
+* Only users with a confirmed paid enrollment may receive the playable video source.
+* Lesson 1 must remain the free preview.
+* Lessons 3–10 must remain locked.
+* Use the existing course video player.
+* Preserve the current progress-tracking and dashboard behavior.
+* Do not alter the existing Stripe product, $497 price, checkout flow, webhook, or enrollment logic.
+* Do not change the legacy CSCS video course.
+
+## Video Metadata
+
+Update the existing Lesson 2 database record with:
+
+* Video storage key or secure URL
+* Original filename
+* MIME type
+* File size
+* Duration
+* Thumbnail or poster image
+* Processing status
+* Updated timestamp
+
+Generate a thumbnail from the uploaded video if one is not provided.
+
+## Access Control
+
+Verify enrollment server-side before returning the Lesson 2 video URL or storage reference.
+
+Do not rely only on a locked frontend card.
+
+For unauthorized users:
+
+* Do not expose the premium video URL
+* Return the existing locked lesson state
+* Display the existing **Unlock Full Course — $497** CTA
+* Use the existing Stripe checkout flow for `ai-agent-builder`
+
+For authorized users:
+
+* Return the playable video source
+* Save viewing progress
+* Resume from the last saved position
+* Mark the lesson complete after 90% watched
+* Update the course dashboard and overall completion percentage
+
+## Verification
+
+After connecting the video, verify:
+
+1. `/course` loads correctly.
+2. Lesson 1 remains publicly playable.
+3. Lesson 2 remains locked for logged-out users.
+4. Lesson 2 remains locked for logged-in users without a paid enrollment.
+5. Lesson 2 plays for a user with a confirmed paid enrollment.
+6. The premium video URL is not present in unauthorized API responses or page source.
+7. Progress saves and resumes correctly.
+8. Completion triggers at 90%.
+9. Lessons 3–10 remain locked.
+10. No duplicate course or lesson record was created.
+11. The existing Stripe checkout still charges **$497**.
+12. Existing CSCS course functionality remains unchanged.
+
+Return a concise summary confirming:
+
+* Where the Lesson 2 video is stored
+* Which existing lesson record was updated
+* Whether `AI_LESSON_2_VIDEO_ID` is still required
+* How server-side access was verified
+* Whether playback, progress, and completion tracking passed

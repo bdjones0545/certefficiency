@@ -1,0 +1,230 @@
+Remediate the confirmed CertEfficiency → Hermes → Sarah production blockers and then rerun the complete production smoke test.
+
+## Confirmed blockers
+
+### BLOCKER-1: Hermes LLM credits exhausted
+
+The live Hermes endpoint is reachable and authenticated requests are accepted, but Sarah message processing currently fails with:
+
+```text
+HTTP 403
+permission-denied
+LLM credits exhausted
+```
+
+Associated team identifier:
+
+```text
+bd0c2279-7c18-4909-9bdd-a1c5fdeec45f
+```
+
+Do not attempt to bypass this provider error in application code.
+
+The LLM account must be replenished or replaced with an authorized production model account before Sarah can be considered functional.
+
+After credits are restored, rerun live inference tests.
+
+### BLOCKER-2: NODE_ENV is not set
+
+Add the following production secret or deployment variable:
+
+```text
+NODE_ENV=production
+```
+
+Before enabling it, inventory every production-only startup check and report which ones will become active.
+
+Confirm at least:
+
+* Sarah signing secret requirement
+* session secret strength validation
+* allowed-origin validation
+* secure-cookie behavior
+* development authentication bypasses
+* verbose error behavior
+* any insecure fallback configuration
+
+Do not weaken a failing production guard merely to make deployment succeed.
+
+### BLOCKER-3: ALLOWED_ORIGINS is missing
+
+Add a production-safe value containing only approved CertEfficiency origins.
+
+Expected origins should include the actual deployed domains, such as:
+
+```text
+https://certefficiency.com
+https://www.certefficiency.com
+```
+
+Include another domain only when it is intentionally required.
+
+Do not use wildcard origins for authenticated APIs.
+
+Validate origins by parsing them as exact origins, not substring matches.
+
+Reject:
+
+* wildcard values in production
+* origins with paths
+* malformed URLs
+* attacker-controlled suffix domains
+* arbitrary localhost origins in production
+
+## Secret validation
+
+Before restarting production, verify that the following actual repository variables are present and sufficiently strong:
+
+* session secret
+* Sarah request-signing secret
+* Hermes API credential
+* Hermes base URL
+* callback secret, if callbacks are used
+* `ALLOWED_ORIGINS`
+* `NODE_ENV`
+
+Do not print secret values.
+
+Report only:
+
+* present or missing
+* length or strength category where safe
+* server-only status
+* startup validation status
+
+## Production startup verification
+
+Restart the application with `NODE_ENV=production`.
+
+Confirm:
+
+1. Production startup guards execute.
+2. The application starts successfully.
+3. Missing or weak secrets cause a controlled startup failure in a separate test.
+4. Secure cookies are enabled where appropriate.
+5. CORS permits the intended CertEfficiency origin.
+6. CORS rejects an unauthorized origin.
+7. Sarah routes reject missing authentication.
+8. No development bypass remains active.
+9. No secrets appear in startup logs.
+10. Readiness reports Sarah as degraded until live inference succeeds.
+
+## Live Sarah smoke test
+
+Once the LLM credits are restored, use an isolated synthetic user and perform the live deployed path:
+
+```text
+CertEfficiency/Replit
+→ Cloudflare Tunnel
+→ Hermes
+→ Sarah
+→ LLM
+→ Hermes
+→ Replit
+→ persisted conversation
+```
+
+Verify:
+
+1. Create a new conversation.
+2. Send a first message.
+3. Receive a semantically valid Sarah response.
+4. Confirm Sarah identifies herself as the certification tutor.
+5. Confirm the user message is persisted.
+6. Confirm Sarah’s response is persisted.
+7. Reload the conversation.
+8. Confirm messages remain correctly ordered.
+9. Send a second contextual message.
+10. Confirm Sarah retains only the intended conversation context.
+11. Start a new conversation.
+12. Confirm the new conversation does not inherit private context.
+13. Replay the original idempotency key.
+14. Confirm no duplicate user or assistant message is created.
+15. Attempt cross-user access.
+16. Confirm controlled `403` or `404`.
+17. Trace the request using one correlation ID across all available logs.
+18. Confirm the frontend draft is preserved during a simulated failure.
+19. Confirm timeout recovery does not duplicate messages.
+20. Confirm readiness changes from degraded to healthy after successful live inference.
+
+## Authentication regression tests
+
+Rerun and preserve evidence for:
+
+* no API key
+* wrong API key
+* missing HMAC signature
+* wrong HMAC secret
+* tampered body
+* expired timestamp
+* valid timestamp
+* replayed request
+* modified idempotency key
+* duplicate simultaneous request
+* unauthorized callback, if applicable
+* valid callback, if applicable
+
+Report HTTP status, safe error code, and duplication result.
+
+## VM operational verification
+
+The previous report correctly marked VM-side operations as unverified.
+
+Collect evidence from the Hermes VM for:
+
+* Hermes service unit
+* Hermes enabled-at-boot status
+* Hermes restart policy
+* Hermes active status
+* Cloudflare Tunnel service unit
+* tunnel enabled-at-boot status
+* tunnel restart policy
+* active tunnel hostname
+* Sarah profile path
+* Sarah profile load status
+* environment-file permissions
+* log rotation configuration
+* disk usage controls
+* last service restart
+* successful Sarah response after a controlled restart
+
+Do not expose secrets or entire environment files.
+
+If Replit cannot access the VM, retain these as `Unable to Verify` and provide the exact commands that must be executed there.
+
+## R2 scope
+
+Keep the R2 course-video path separate from the Sarah readiness decision.
+
+For R2, verify separately:
+
+* 11 database lesson records
+* 11 `video_object_key` mappings
+* all 11 live R2 objects
+* enrolled-user access to Lessons 2–11
+* signed-URL refresh after expiration
+
+Do not describe locked API responses as evidence that database keys are missing.
+
+## Final classification
+
+Use one exact classification:
+
+```text
+Production Ready
+Production Ready With Minor Risks
+Not Production Ready
+Unable to Verify
+```
+
+Do not upgrade from `Not Production Ready` until:
+
+* Sarah completes live inference
+* production guards are active
+* allowed origins are configured
+* deployed multi-turn persistence succeeds
+* tenant isolation succeeds
+* retry and idempotency behavior succeed live
+* VM restart behavior is verified
+
+Update `artifacts/api-server/AUDIT-REPORT.md` with the remediation evidence, preserving the original findings in the audit-history section.

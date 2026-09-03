@@ -1,0 +1,974 @@
+Build a world-class, Apple-inspired landing page for **CertEfficiency**, an AI-powered certification preparation platform delivered entirely through a conversational chat interface.
+
+The landing page must clearly communicate that CertEfficiency is not a traditional course platform, content library, LMS, or fixed certification program.
+
+The core product is a conversation with **Sarah**, an AI certification specialist.
+
+A learner tells Sarah which certification they are preparing for, provides relevant direction or source materials, and Sarah builds and guides the study experience through chat.
+
+The entire product experience should feel as simple as opening a conversation and saying:
+
+**“I need help preparing for this certification.”**
+
+Sarah then helps the learner understand what to study, creates study materials, asks questions, explains concepts, tracks progress, identifies weaknesses, and guides the learner toward readiness.
+
+## Primary positioning
+
+CertEfficiency should be presented as:
+
+**A conversational AI study system for professional certifications.**
+
+Core message:
+
+**Tell Sarah what certification you are pursuing. She builds the study experience around you.**
+
+Supporting message:
+
+**Upload the certification requirements, share your materials, or simply explain your goal. Sarah turns the conversation into a personalized preparation system.**
+
+The site must not be centered around the CSCS certification.
+
+CSCS may be referenced as an example or the first certification Sarah has supported, but the brand must clearly extend to many professional certifications.
+
+Sarah can be directed to help with certifications across areas such as:
+
+* Health and fitness
+* Information technology
+* Project management
+* Finance and accounting
+* Healthcare
+* Education
+* Skilled trades
+* Human resources
+* Safety and compliance
+* Organization-specific credentials
+
+Do not imply that every certification is already fully supported.
+
+The message should be that Sarah can be equipped and directed using trusted certification materials.
+
+## Product concept
+
+CertEfficiency works through one continuous chat interface.
+
+There should not be a traditional course dashboard filled with modules, sidebars, cards, or complex navigation.
+
+The experience should feel more like interacting with an intelligent personal tutor.
+
+Through the chat, a learner can:
+
+* Tell Sarah which certification they are pursuing
+* Explain their exam date and study timeline
+* Upload certification handbooks, exam outlines, notes, guides, and approved source materials
+* Ask Sarah to create a study plan
+* Ask questions about difficult concepts
+* Request lessons or simplified explanations
+* Generate practice questions
+* Complete quizzes directly in the conversation
+* Receive feedback on incorrect answers
+* Review weak topics
+* Ask for flashcards or study summaries
+* Track what they have already covered
+* Resume previous study conversations
+* Receive recommendations for what to study next
+* Ask Sarah whether they appear ready for the exam
+
+The chat should maintain context over time so the learner does not need to start over during every session.
+
+## Design direction
+
+Create a premium product website inspired by the restraint, clarity, typography, and product storytelling associated with Apple.
+
+The page should feel like it was created by an elite design and engineering team.
+
+It must feel:
+
+* Premium
+* Minimal
+* Intelligent
+* Calm
+* Precise
+* Human
+* Conversational
+* Highly polished
+
+Avoid making it look like:
+
+* A generic SaaS landing page
+* A traditional LMS
+* A course marketplace
+* A chatbot template
+* A school website
+* A test-prep website
+* A generic AI assistant
+* A CSCS-only product
+
+Use:
+
+* Large typography
+* Generous white space
+* Strong section pacing
+* Soft-gray backgrounds
+* Deep charcoal text
+* Restrained blue accents
+* Smooth transitions
+* Premium chat mockups
+* Subtle shadows
+* Refined borders
+* Elegant mobile responsiveness
+* Minimal navigation
+* High-quality product storytelling
+
+Avoid:
+
+* Excessive feature cards
+* Dense grids
+* Fake charts
+* Fake learner statistics
+* Fake certification logos
+* Stock photos of students
+* Graduation caps
+* Floating textbooks
+* AI robots
+* Neon effects
+* Overly colorful gradients
+* Excessive animation
+* Dashboard-style analytics as the primary visual
+
+Suggested palette:
+
+* Background: `#FFFFFF`
+* Secondary background: `#F5F5F7`
+* Primary text: `#1D1D1F`
+* Secondary text: `#6E6E73`
+* Accent: `#0071E3`
+* Accent hover: `#0077ED`
+* Border: `rgba(0, 0, 0, 0.08)`
+* Chat user message: deep blue
+* Chat assistant message: soft neutral gray
+
+Suggested font stack:
+
+```css
+font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display",
+"SF Pro Text", "Segoe UI", sans-serif;
+```
+
+## Navigation
+
+Create a slim sticky navigation bar with a subtle blurred background.
+
+Left side:
+
+* CertEfficiency wordmark
+* Minimal abstract logo representing knowledge, mastery, conversation, or progress
+
+Navigation links:
+
+* How It Works
+* Meet Sarah
+* Certifications
+* For Organizations
+* Pricing
+
+Right side:
+
+* Sign In
+* Primary CTA: **Start a Conversation**
+
+On mobile, use a refined menu drawer.
+
+Do not overcrowd the navigation.
+
+## Hero section
+
+Create a highly polished hero section centered around the simplicity of starting a conversation.
+
+Eyebrow:
+
+**CONVERSATIONAL CERTIFICATION PREP**
+
+Primary headline:
+
+**Your certification journey starts with a conversation.**
+
+Supporting copy:
+
+**Tell Sarah what certification you are pursuing, what materials you have, and where you need help. She turns that conversation into a personalized study experience.**
+
+Primary CTA:
+
+**Start a Conversation**
+
+Secondary CTA:
+
+**See How Sarah Works**
+
+Supporting trust line:
+
+**One conversation. Personalized preparation. Continuous progress.**
+
+The hero should feel spacious and confident.
+
+Do not place a generic dashboard below the headline.
+
+The main product visual must be a premium CertEfficiency chat interface.
+
+## Hero chat experience
+
+Show a large desktop chat interface with a complementary mobile version.
+
+The conversation should demonstrate the product naturally.
+
+Example conversation:
+
+Learner:
+
+**I’m preparing for a professional certification and I’m not sure where to begin.**
+
+Sarah:
+
+**Let’s build your study plan. What certification are you pursuing, and when is your exam?**
+
+Learner:
+
+**The CSCS. My exam is in eight weeks.**
+
+Sarah:
+
+**Great. You can upload the exam outline, study notes, or any materials you are authorized to use. I’ll help organize the content, identify your starting point, and create a study approach around your timeline.**
+
+Below the conversation, show suggested actions:
+
+* Upload exam outline
+* Build my study plan
+* Assess my current knowledge
+* Ask Sarah a question
+
+The chat interface should look premium, calm, and highly usable.
+
+It should not look like a generic customer-support widget.
+
+## Immediate product demonstration
+
+Directly below the hero, create a section that shows how simple the product is.
+
+Headline:
+
+**Just tell Sarah what you need.**
+
+Show a sequence of example prompts appearing inside the chat input:
+
+* “Create a six-week study plan for my exam.”
+* “Explain this topic in simpler terms.”
+* “Quiz me on what I studied yesterday.”
+* “Turn this handbook into a study guide.”
+* “Show me the concepts I keep missing.”
+* “Do you think I am ready for the exam?”
+
+As the prompts change, show Sarah responding with a relevant study experience.
+
+Use subtle animation, but do not make the section distracting.
+
+## Core explanation section
+
+Eyebrow:
+
+**MORE THAN A CHATBOT**
+
+Headline:
+
+**The conversation becomes the study system.**
+
+Copy:
+
+Sarah does more than answer isolated questions.
+
+She uses the certification goal, source materials, prior conversations, learner performance, and study history to guide the preparation process over time.
+
+Each interaction can become part of a connected learning experience.
+
+Sarah can remember:
+
+* Which certification the learner is pursuing
+* When the exam is scheduled
+* Which materials were provided
+* Which topics have been covered
+* Which concepts remain unclear
+* Which questions were answered incorrectly
+* Which explanations helped
+* What the learner should study next
+
+Add a strong statement:
+
+**The learner should never feel like they are starting over.**
+
+## How it works section
+
+Create a four-step Apple-style visual sequence.
+
+### Step 1: Start the conversation
+
+Tell Sarah which certification you are pursuing and what you need help with.
+
+Example prompt:
+
+**“I’m studying for the PMP exam and I have twelve weeks.”**
+
+### Step 2: Give Sarah the right context
+
+Upload or describe the trusted materials that define the certification.
+
+This may include:
+
+* Candidate handbooks
+* Exam outlines
+* Professional standards
+* Instructor materials
+* Personal notes
+* Study guides
+* Approved course resources
+
+### Step 3: Learn through conversation
+
+Sarah creates lessons, explains concepts, asks questions, generates practice, and adapts based on the learner’s responses.
+
+### Step 4: Keep improving
+
+Sarah maintains the study context, revisits weak areas, tracks progress, and recommends the next best action.
+
+The transition between each step should feel smooth and intentional.
+
+## Meet Sarah section
+
+Eyebrow:
+
+**MEET SARAH**
+
+Headline:
+
+**A certification specialist you can talk to.**
+
+Copy:
+
+Sarah is the intelligence behind CertEfficiency.
+
+She can be directed toward a certification, equipped with trusted materials, and given a clear learner goal.
+
+From there, she helps turn complex requirements into an understandable and personalized preparation experience.
+
+Sarah should be presented as a complete AI learning specialist, not a generic chatbot.
+
+Her capabilities include:
+
+* Understanding certification requirements
+* Organizing source materials
+* Creating study plans
+* Producing structured study materials
+* Explaining difficult concepts
+* Asking follow-up questions
+* Generating practice questions
+* Evaluating learner responses
+* Identifying recurring mistakes
+* Revisiting weak topics
+* Tracking learning history
+* Recommending what to study next
+* Adapting explanations to the learner
+* Maintaining context over time
+
+Include this statement prominently:
+
+**Sarah does not need to know everything. She needs the right direction, trusted materials, and a clear certification goal.**
+
+## Chat demonstration section
+
+Create a large, immersive conversation showing how Sarah teaches rather than simply provides answers.
+
+Example:
+
+Learner:
+
+**I keep getting questions about risk management wrong.**
+
+Sarah:
+
+**Before we review the answers, tell me how you currently define risk response planning.**
+
+Learner:
+
+**It is deciding how to react after a risk happens.**
+
+Sarah:
+
+**That explains the confusion. Risk response planning happens before the event. Let’s rebuild the concept using the terminology from your uploaded exam outline.**
+
+Sarah:
+
+**Which response strategy changes the probability or impact of a negative risk before it occurs?**
+
+Display multiple-choice options directly within the chat.
+
+After the learner chooses an answer, Sarah should provide feedback and continue the lesson.
+
+The section should show that CertEfficiency supports:
+
+* Explanations
+* Questions
+* Interactive answers
+* Feedback
+* Follow-up reasoning
+* Continued learning
+
+## Source-material section
+
+Eyebrow:
+
+**GROUNDED IN THE MATERIALS THAT MATTER**
+
+Headline:
+
+**Bring the requirements. Sarah builds the preparation around them.**
+
+Copy:
+
+Certifications differ in their terminology, standards, domains, testing methods, and expected reasoning.
+
+Sarah can use trusted materials to understand the certification and shape the conversation around it.
+
+Show a clean file-upload experience within the chat.
+
+Example learner message:
+
+**Use these files to help me prepare.**
+
+Attached files:
+
+* Candidate Handbook.pdf
+* Exam Content Outline.pdf
+* Instructor Notes.docx
+* Professional Standards.pdf
+
+Sarah response:
+
+**I have organized the materials into seven major domains and forty-three learning objectives. Would you like me to assess your current knowledge or create a study plan first?**
+
+Show two response buttons:
+
+* Assess my knowledge
+* Create my study plan
+
+Include a visible notice:
+
+**Users and organizations are responsible for ensuring they have permission to upload and use all source materials.**
+
+Do not imply that CertEfficiency provides copyrighted exam materials without authorization.
+
+## Personalized study-plan section
+
+Eyebrow:
+
+**BUILT AROUND THE LEARNER**
+
+Headline:
+
+**No two study conversations should be identical.**
+
+Copy:
+
+Sarah can adapt the preparation process based on:
+
+* Certification
+* Exam date
+* Available study time
+* Existing knowledge
+* Uploaded materials
+* Preferred learning style
+* Recent performance
+* Weak topics
+* Confidence
+* Study history
+
+Show Sarah building a study plan conversationally.
+
+Example:
+
+Sarah:
+
+**You have six weeks, can study four days per week, and scored lowest in three domains. I recommend starting with a focused two-week foundation phase before adding timed practice.**
+
+Show the resulting plan appearing as a structured message inside the chat rather than as a separate dashboard.
+
+Example:
+
+**Week 1**
+
+* Review Domain 1 foundations
+* Complete two guided lessons
+* Answer 20 targeted questions
+* Revisit missed concepts on Friday
+
+Include conversational actions:
+
+* Adjust this plan
+* Make it more intensive
+* Start today’s lesson
+* Add this to my schedule
+
+## Practice through conversation section
+
+Eyebrow:
+
+**ACTIVE PRACTICE**
+
+Headline:
+
+**Study by doing, not only reading.**
+
+Copy:
+
+Sarah can turn the chat into an active learning experience.
+
+She can:
+
+* Ask multiple-choice questions
+* Create scenario-based questions
+* Request short written responses
+* Ask the learner to explain a concept
+* Provide hints
+* Review incorrect reasoning
+* Increase or decrease difficulty
+* Revisit previously missed questions
+* Generate rapid review sessions
+
+Show an interactive chat-based quiz.
+
+The user should be able to select an answer directly inside the conversation.
+
+After the answer, Sarah should explain:
+
+* Why the answer is correct
+* Why the alternatives are incorrect
+* What concept was being tested
+* Whether the topic should be reviewed again
+
+## Progress and memory section
+
+Eyebrow:
+
+**A CONVERSATION THAT REMEMBERS**
+
+Headline:
+
+**Your progress stays connected.**
+
+Copy:
+
+CertEfficiency should preserve the learner’s certification context and study history across conversations.
+
+Instead of presenting a complex analytics dashboard, show progress naturally through Sarah’s responses.
+
+Example:
+
+Learner:
+
+**What should I study today?**
+
+Sarah:
+
+**You performed well in program design yesterday, but you continue to miss questions involving organization and administration. I recommend a twenty-minute review followed by ten scenario-based questions.**
+
+Show a subtle side panel or conversation summary containing:
+
+* Current certification
+* Exam date
+* Current study phase
+* Topics recently studied
+* Areas needing attention
+* Next recommended action
+
+The chat remains the primary interface.
+
+The side panel should support the conversation rather than compete with it.
+
+## Certification flexibility section
+
+Eyebrow:
+
+**ONE INTERFACE. MANY CERTIFICATIONS.**
+
+Headline:
+
+**The conversation changes with the certification.**
+
+Copy:
+
+A strength coach, project manager, cybersecurity professional, healthcare worker, or accountant may all use the same CertEfficiency interface.
+
+What changes is the context Sarah receives.
+
+Show examples of conversational starting prompts:
+
+* “Help me prepare for the CSCS exam.”
+* “Build a study plan for CompTIA Security+.”
+* “Turn my PMP materials into a six-week course.”
+* “Quiz me for my EMT certification.”
+* “Help our employees prepare for an internal safety credential.”
+* “Create a study workspace for our organization’s certification.”
+
+Clearly label these as examples of potential certification use cases.
+
+Do not imply that every example is already available as a completed program.
+
+## For individuals section
+
+Eyebrow:
+
+**FOR INDIVIDUAL LEARNERS**
+
+Headline:
+
+**A personal certification tutor, available when you need it.**
+
+Copy:
+
+CertEfficiency gives learners one place to ask questions, organize materials, practice, review mistakes, and decide what to study next.
+
+Potential benefits:
+
+* Less time deciding what to study
+* Explanations tailored to the learner
+* Continuous learning context
+* Practice based on actual weaknesses
+* Flexible preparation across devices
+* A direct path back into studying
+
+CTA:
+
+**Start Studying With Sarah**
+
+## For organizations section
+
+Eyebrow:
+
+**FOR EDUCATORS AND ORGANIZATIONS**
+
+Headline:
+
+**Turn your curriculum into a conversational learning experience.**
+
+Copy:
+
+Schools, training companies, employers, instructors, and certification organizations can use CertEfficiency to create controlled learning experiences around their own approved materials.
+
+Potential organization capabilities:
+
+* Private Sarah configurations
+* Organization-controlled source materials
+* Custom tutoring instructions
+* Cohort access
+* Learner conversation history
+* Instructor visibility
+* Assignment prompts
+* Approved assessments
+* Progress summaries
+* Content governance
+* Custom certifications
+* Internal workforce credentials
+
+The organization experience should still be centered around chat.
+
+An administrator provides the materials and learning direction. Learners then interact with Sarah conversationally.
+
+CTA:
+
+**Explore CertEfficiency for Organizations**
+
+## Founder story
+
+Headline:
+
+**It started with one person asking for help.**
+
+Copy:
+
+CertEfficiency began after a certification candidate reached out to Bryan Jones on LinkedIn because they were struggling to prepare for an exam and needed better study materials.
+
+Instead of sending another static guide, Bryan began building Sarah—an AI certification specialist that could listen, teach, ask questions, organize information, and continue learning with the user over time.
+
+That experience led to a broader idea:
+
+**What if preparing for a certification could begin with a conversation instead of a pile of disconnected materials?**
+
+Founder details:
+
+**Bryan Jones, MS, CSCS, PES, EP-C**
+
+Strength coach, exercise science professional, and developer of AI-powered coaching and education systems.
+
+Keep this section human, credible, and understated.
+
+## Pricing section
+
+Headline:
+
+**Start with a conversation. Build from there.**
+
+Pricing must be managed from one centralized configuration file.
+
+Do not hard-code prices throughout the website.
+
+Create product architecture for:
+
+### Individual
+
+Designed for one learner preparing for a professional certification.
+
+Possible features:
+
+* Personal conversation with Sarah
+* One active certification workspace
+* File uploads
+* Personalized study planning
+* AI-generated study materials
+* Interactive practice
+* Learning memory
+* Progress summaries
+* Desktop and mobile access
+
+### Professional
+
+Designed for learners pursuing multiple certifications or requiring expanded usage.
+
+Possible features:
+
+* Multiple certification workspaces
+* Expanded conversation history
+* Higher upload limits
+* Additional study-plan generation
+* Cross-certification learner profile
+* Priority support
+
+### Organization
+
+Designed for schools, instructors, training companies, and employers.
+
+Possible features:
+
+* Private certification environments
+* Multiple learners
+* Controlled source materials
+* Custom Sarah instructions
+* Instructor reporting
+* Cohort management
+* Content approval
+* Administrative controls
+
+Use editable placeholders if final pricing has not yet been decided.
+
+Do not fabricate discounts, pass rates, learner counts, or financial claims.
+
+## Final CTA
+
+Create a premium full-width closing section.
+
+Headline:
+
+**The next step is simple. Ask Sarah.**
+
+Supporting text:
+
+**Tell her the certification, share what you have, and start building a study experience around the way you learn.**
+
+Primary CTA:
+
+**Start a Conversation**
+
+Secondary CTA:
+
+**See How It Works**
+
+Include a final visual of an empty chat input with the placeholder:
+
+**What certification are you preparing for?**
+
+## Footer
+
+Include:
+
+* CertEfficiency logo
+* How It Works
+* Meet Sarah
+* Certifications
+* For Individuals
+* For Organizations
+* Pricing
+* About
+* Contact
+* Privacy Policy
+* Terms of Service
+* Accessibility
+
+Use the current year dynamically.
+
+Include this disclaimer:
+
+**CertEfficiency is an independent educational platform. Unless explicitly stated, it is not affiliated with, endorsed by, or sponsored by the organizations that administer certifications referenced on the platform.**
+
+## Copy standards
+
+The brand voice should be:
+
+* Intelligent
+* Direct
+* Calm
+* Helpful
+* Credible
+* Encouraging
+* Modern
+* Human
+
+Avoid:
+
+* Revolutionary
+* Game-changing
+* Crush your exam
+* Unlock your potential
+* Supercharge your learning
+* AI magic
+* Guaranteed passing
+* Unsupported readiness claims
+* Exaggerated marketing language
+
+Do not refer to Sarah as merely a chatbot.
+
+Use terms such as:
+
+* AI certification specialist
+* AI study partner
+* Conversational learning system
+* Certification tutor
+* Personalized study system
+
+## Functional requirements
+
+Build the complete landing page inside the existing CertEfficiency application.
+
+Before making changes:
+
+1. Inspect the current codebase.
+2. Identify the framework, routes, authentication system, design system, and existing chat functionality.
+3. Preserve all existing application routes, database connections, APIs, authentication flows, and user data.
+4. Determine whether the marketing landing page belongs at the public root route.
+5. Ensure authenticated users can continue into the existing chat application.
+6. Do not rebuild working chat functionality unless required for the landing-page demonstration.
+7. Use realistic but non-functional mock chat data for landing-page visuals unless connecting safely to the existing product.
+
+Technical requirements:
+
+* Fully responsive
+* Production-quality React components
+* Clean component architecture
+* Semantic HTML
+* Keyboard-accessible navigation
+* Accessible chat demonstrations
+* WCAG-conscious contrast
+* ARIA labels where appropriate
+* Reduced-motion support
+* Lazy loading below the fold
+* Optimized images and assets
+* No layout shift
+* Fast initial load
+* SEO metadata
+* Open Graph metadata
+* Social-sharing metadata
+* Structured data where appropriate
+* Centralized landing-page content
+* Centralized pricing configuration
+* Centralized example certification data
+* Functional navigation
+* Functional CTAs
+* No dead buttons
+* No fake testimonials
+* No fake learner counts
+* No fake pass rates
+* No unsupported certification partnerships
+* No certifications falsely marked as fully available
+
+## Chat-interface design requirements
+
+The chat interface is the most important visual element on the page.
+
+It must include:
+
+* Clear Sarah identity
+* Conversation title
+* Persistent conversation history
+* New conversation action
+* Conversation selection
+* Conversation deletion controls
+* Message composer
+* File-upload control
+* Suggested prompts
+* User messages
+* Sarah messages
+* Interactive response buttons
+* Multiple-choice question support
+* Loading and thinking states
+* Error states
+* Mobile layout
+* Desktop layout
+* Accessible focus states
+* Readable dark-mode message contrast if dark mode exists
+
+The landing page should visually demonstrate the chat product without overwhelming visitors with every feature.
+
+The chat should feel like a premium personal workspace, not a customer-support popup.
+
+## Animation direction
+
+Use subtle animation to make the conversation feel alive.
+
+Recommended:
+
+* Chat messages appear sequentially
+* Suggested prompts transition gently
+* Uploaded files process into organized study topics
+* Sarah typing indicator appears briefly
+* Product mockup scales gently into view
+* Text fades upward
+* Navigation blur increases after scrolling
+* Interactive answer feedback appears smoothly
+
+Avoid:
+
+* Constant floating objects
+* Bouncing buttons
+* Excessive parallax
+* Spinning icons
+* Neon glows
+* Long loading animations
+* Cursor-following effects
+* Distracting animated backgrounds
+
+Respect `prefers-reduced-motion`.
+
+## Final validation
+
+After implementation:
+
+1. Test the landing page at 375px, 430px, 768px, 1024px, and 1440px.
+2. Confirm the chat interface remains readable and usable at every width.
+3. Confirm all CTA destinations work.
+4. Confirm sign-in and authenticated routes still work.
+5. Confirm no existing chat conversations or user data were affected.
+6. Confirm there are no visible console errors.
+7. Run the existing test suite.
+8. Remove generic template content.
+9. Remove fake metrics, testimonials, or unsupported claims.
+10. Confirm the page immediately communicates that CertEfficiency is a conversational certification-learning platform.
+11. Confirm the page does not look like a traditional course website.
+12. Confirm the page does not appear limited to the CSCS certification.
+
+The final result should make visitors understand the product within seconds:
+
+**They tell Sarah what certification they are pursuing, and the study experience is built through the conversation.**

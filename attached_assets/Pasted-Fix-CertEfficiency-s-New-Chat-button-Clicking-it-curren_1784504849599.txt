@@ -1,0 +1,304 @@
+Fix CertEfficiency’s **New Chat** button. Clicking it currently does not create or open a new conversation.
+
+## Required architecture
+
+The New Chat flow must be:
+
+```text
+Click New Chat
+→ create local conversation in CertEfficiency
+→ return local conversation immediately
+→ update frontend state
+→ navigate to the new conversation
+→ initialize Sarah asynchronously
+→ render Sarah’s opening message when ready
+```
+
+The frontend must not wait for Sarah’s `/v1/conversations` response before opening the chat.
+
+## Diagnose the current failure
+
+Trace the complete flow and report where it stops:
+
+```text
+new_chat_clicked
+frontend_create_mutation_started
+conversation_route_entered
+conversation_validated
+conversation_saved
+conversation_response_sent
+frontend_create_mutation_succeeded
+conversation_state_updated
+navigation_started
+sarah_initialization_started
+sarah_initialization_completed
+```
+
+Capture safely:
+
+* whether the click handler fires
+* whether `createConv.mutateAsync()` is called
+* the exact frontend request URL
+* the HTTP status and safe response body
+* whether a local database row is inserted
+* whether the route returns a conversation ID
+* whether the frontend updates `activeConversationId`
+* whether navigation occurs
+* whether Sarah initialization blocks the response
+* whether `createConv.isPending` becomes permanently stuck
+* any uncaught frontend or backend error
+
+Do not log secrets.
+
+## Backend fix
+
+Inspect:
+
+```text
+POST /api/conversations
+```
+
+This endpoint must:
+
+1. Authenticate the user.
+2. Validate the request.
+3. Insert the local conversation.
+4. Commit the database transaction.
+5. Return `201` immediately with the canonical local conversation.
+
+Example response:
+
+```json
+{
+  "conversation": {
+    "id": "local-conversation-id",
+    "title": "New conversation",
+    "status": "active",
+    "createdAt": "..."
+  }
+}
+```
+
+Do not await Sarah before returning.
+
+After the response is committed, initialize Sarah asynchronously:
+
+```text
+local conversation saved
+→ HTTP response sent
+→ background Sarah initialization starts
+```
+
+Sarah initialization failure must not:
+
+* delete the local conversation
+* roll back the insert
+* change the successful response into a `500`
+* prevent navigation
+* disable the composer permanently
+
+Store Sarah initialization state separately:
+
+```text
+pending
+processing
+completed
+failed
+```
+
+A failed initialization should be retryable from the first user message.
+
+## Frontend fix
+
+Inspect the New Chat handler in the CertEfficiency frontend.
+
+It should resemble:
+
+```ts
+async function handleNewChat() {
+  setNewChatError(null);
+
+  try {
+    const result = await createConv.mutateAsync();
+
+    const conversation = result.conversation ?? result;
+
+    if (!conversation?.id) {
+      throw new Error("Conversation was created without an ID");
+    }
+
+    queryClient.setQueryData(["conversations"], (existing) => {
+      // insert the newly created conversation safely
+    });
+
+    setActiveConversationId(conversation.id);
+    navigate(`/conversations/${conversation.id}`);
+
+    queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    queryClient.invalidateQueries({
+      queryKey: ["conversation", conversation.id],
+    });
+  } catch (error) {
+    console.error("new_chat_failed", error);
+    setNewChatError("Couldn't start a new conversation. Please try again.");
+  }
+}
+```
+
+Verify the frontend reads the correct response shape. If the backend returns:
+
+```json
+{ "conversation": { "id": "..." } }
+```
+
+do not incorrectly expect:
+
+```json
+{ "id": "..." }
+```
+
+Normalize the response in one place.
+
+## Button-state fixes
+
+The New Chat button should be disabled only while the local create request is pending:
+
+```ts
+disabled={createConv.isPending}
+```
+
+It must not be disabled because:
+
+* Sarah is generating an opening message
+* another conversation has a failed Sarah job
+* `activeJobId` from the previous conversation is set
+* the warm runtime is starting
+* a previous initialization failed
+
+Clear any previous conversation-specific state before creating the new one:
+
+```ts
+setActiveJobId(null);
+setSendError(null);
+setNewChatError(null);
+```
+
+Do not reuse the prior conversation’s job state in the new conversation.
+
+## Check for stale conversation IDs
+
+Inspect whether the route or mutation is accidentally sending an existing conversation ID.
+
+Every New Chat click must generate a new local ID on the backend.
+
+Verify:
+
+```text
+first click  → conversation A
+second click → conversation B
+third click  → conversation C
+```
+
+All IDs must be different.
+
+## Check query caching
+
+Ensure the conversations query is invalidated after creation.
+
+Inspect query keys for mismatches such as:
+
+```ts
+["conversation"]
+["conversations"]
+["user-conversations"]
+```
+
+Use one canonical key consistently.
+
+Also verify the currently selected conversation is not being immediately overwritten by a refetch that restores the previous conversation.
+
+## Sarah initialization
+
+Once the local conversation has opened, asynchronously call Sarah with:
+
+```json
+{
+  "requestId": "<unique request ID>",
+  "conversationId": "<local conversation ID>"
+}
+```
+
+Normalize Sarah’s response:
+
+```json
+{
+  "conversationId": "...",
+  "message": {
+    "type": "text",
+    "content": "..."
+  },
+  "actions": [],
+  "metadata": {}
+}
+```
+
+Persist the opening message when it arrives, then invalidate:
+
+```ts
+["messages", conversationId]
+```
+
+Do not block local creation or navigation while waiting for Sarah.
+
+## Timeout behavior
+
+Sarah may take approximately 50 seconds. The local New Chat request must still complete in under two seconds.
+
+Performance targets:
+
+```text
+local conversation creation: under 2 seconds
+navigation into chat: under 2 seconds
+Sarah opening message: asynchronous, up to 120 seconds
+```
+
+## Tests
+
+Add tests covering:
+
+1. New Chat creates a local conversation immediately.
+2. Sarah initialization takes 60 seconds but the chat opens immediately.
+3. Sarah initialization returns `400`.
+4. Sarah initialization returns `401`.
+5. Sarah initialization times out.
+6. Sarah initialization returns an invalid response.
+7. A previous failed job does not disable New Chat.
+8. Clicking New Chat twice creates two unique conversations.
+9. Backend response envelope is normalized correctly.
+10. The new conversation becomes the active conversation.
+11. Sarah’s opening message appears later without replacing the selected conversation.
+
+## Completion criteria
+
+The fix is complete when:
+
+* clicking New Chat always creates a new local conversation
+* the new conversation appears in the sidebar
+* the app navigates into it immediately
+* the composer is enabled immediately
+* the previous conversation’s job state is cleared
+* Sarah initializes in the background
+* Sarah’s opening message appears when ready
+* Sarah failure does not remove or block the conversation
+* repeated New Chat clicks create unique conversations
+* logs confirm the full route and frontend state transition
+
+Return:
+
+* exact root cause
+* files changed
+* frontend response shape before and after
+* backend response timing
+* whether Sarah was blocking local creation
+* test results
+* final end-to-end result

@@ -1,0 +1,1632 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: CertEfficiency API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Authentication operations
+  - name: certifications
+    description: Certification operations
+  - name: conversations
+    description: Conversation operations
+  - name: messages
+    description: Message operations
+  - name: practice
+    description: Practice question operations
+  - name: mockExams
+    description: Mock exam operations
+  - name: studyPlans
+    description: Study plan operations
+  - name: progress
+    description: Progress tracking operations
+  - name: uploads
+    description: File upload operations
+  - name: settings
+    description: Settings operations
+  - name: sarah
+    description: Sarah AI service operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /health/database:
+    get:
+      operationId: healthCheckDatabase
+      tags: [health]
+      summary: Database health check
+      responses:
+        "200":
+          description: Database healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterInput"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResult"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout current user
+      responses:
+        "200":
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/forgot-password:
+    post:
+      operationId: forgotPassword
+      tags: [auth]
+      summary: Request password reset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForgotPasswordInput"
+      responses:
+        "200":
+          description: Reset email sent if account exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /auth/reset-password:
+    post:
+      operationId: resetPassword
+      tags: [auth]
+      summary: Reset password using token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordInput"
+      responses:
+        "200":
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change password for authenticated user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordInput"
+      responses:
+        "200":
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /certifications:
+    get:
+      operationId: listCertifications
+      tags: [certifications]
+      summary: List all available certifications
+      responses:
+        "200":
+          description: List of certifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Certification"
+
+  /user-certifications:
+    get:
+      operationId: listUserCertifications
+      tags: [certifications]
+      summary: List user's selected certifications
+      responses:
+        "200":
+          description: List of user certifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserCertification"
+    post:
+      operationId: createUserCertification
+      tags: [certifications]
+      summary: Add a certification for the user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCertificationInput"
+      responses:
+        "201":
+          description: User certification created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCertification"
+
+  /user-certifications/{id}:
+    patch:
+      operationId: updateUserCertification
+      tags: [certifications]
+      summary: Update user certification details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCertificationUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCertification"
+
+  /conversations:
+    get:
+      operationId: listConversations
+      tags: [conversations]
+      summary: List user conversations
+      responses:
+        "200":
+          description: List of conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Conversation"
+    post:
+      operationId: createConversation
+      tags: [conversations]
+      summary: Create a new conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationInput"
+      responses:
+        "201":
+          description: Conversation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+
+  /conversations/{id}:
+    get:
+      operationId: getConversation
+      tags: [conversations]
+      summary: Get a conversation by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateConversation
+      tags: [conversations]
+      summary: Update conversation (rename, archive)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConversationUpdate"
+      responses:
+        "200":
+          description: Updated conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+    delete:
+      operationId: deleteConversation
+      tags: [conversations]
+      summary: Delete a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /conversations/{id}/messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: Get messages for a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: sendMessage
+      tags: [messages]
+      summary: Send a message in a conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Message created and Sarah response initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendMessageResult"
+
+  /messages/{id}/retry:
+    post:
+      operationId: retryMessage
+      tags: [messages]
+      summary: Retry a failed message
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Retry initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendMessageResult"
+
+  /study-modes/start:
+    post:
+      operationId: startStudyMode
+      tags: [practice]
+      summary: Start a study mode session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyModeInput"
+      responses:
+        "201":
+          description: Study session started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySession"
+
+  /practice/{questionId}/answer:
+    post:
+      operationId: submitAnswer
+      tags: [practice]
+      summary: Submit an answer to a practice question
+      parameters:
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnswerInput"
+      responses:
+        "200":
+          description: Answer submitted and feedback provided
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnswerResult"
+        "409":
+          description: Already answered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /mock-exams:
+    post:
+      operationId: createMockExam
+      tags: [mockExams]
+      summary: Start a new mock exam
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MockExamInput"
+      responses:
+        "201":
+          description: Mock exam created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MockExam"
+
+  /mock-exams/{id}:
+    get:
+      operationId: getMockExam
+      tags: [mockExams]
+      summary: Get mock exam details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Mock exam
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MockExam"
+
+  /mock-exams/{id}/answers:
+    patch:
+      operationId: saveMockExamAnswers
+      tags: [mockExams]
+      summary: Autosave answers during exam
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MockExamAnswersInput"
+      responses:
+        "200":
+          description: Answers saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /mock-exams/{id}/submit:
+    post:
+      operationId: submitMockExam
+      tags: [mockExams]
+      summary: Submit a completed mock exam
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Exam submitted with results
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MockExamResult"
+
+  /study-plans:
+    post:
+      operationId: createStudyPlan
+      tags: [studyPlans]
+      summary: Generate a study plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyPlanInput"
+      responses:
+        "201":
+          description: Study plan created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPlan"
+
+  /study-plans/current:
+    get:
+      operationId: getCurrentStudyPlan
+      tags: [studyPlans]
+      summary: Get current active study plan
+      responses:
+        "200":
+          description: Current study plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPlan"
+        "404":
+          description: No active study plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /study-plans/{id}:
+    patch:
+      operationId: updateStudyPlan
+      tags: [studyPlans]
+      summary: Update study plan details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudyPlanUpdate"
+      responses:
+        "200":
+          description: Updated study plan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudyPlan"
+
+  /progress:
+    get:
+      operationId: getProgress
+      tags: [progress]
+      summary: Get overall user progress and readiness
+      responses:
+        "200":
+          description: User progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProgress"
+
+  /progress/domains:
+    get:
+      operationId: getProgressDomains
+      tags: [progress]
+      summary: Get domain-by-domain mastery breakdown
+      responses:
+        "200":
+          description: Domain mastery list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DomainMastery"
+
+  /progress/events:
+    get:
+      operationId: getProgressEvents
+      tags: [progress]
+      summary: Get recent progress events
+      responses:
+        "200":
+          description: Progress events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProgressEvent"
+
+  /uploads:
+    get:
+      operationId: listUploads
+      tags: [uploads]
+      summary: List user uploads
+      responses:
+        "200":
+          description: List of uploads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Upload"
+    post:
+      operationId: createUpload
+      tags: [uploads]
+      summary: Upload a file (multipart/form-data handled by server middleware)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadMetadataInput"
+      responses:
+        "201":
+          description: File uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Upload"
+        "400":
+          description: Unsupported file type or size exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /uploads/{id}:
+    delete:
+      operationId: deleteUpload
+      tags: [uploads]
+      summary: Delete an upload
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get user settings
+      responses:
+        "200":
+          description: User settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update user settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserSettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserSettings"
+
+  /account:
+    delete:
+      operationId: deleteAccount
+      tags: [settings]
+      summary: Delete user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteAccountInput"
+      responses:
+        "200":
+          description: Account deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "400":
+          description: Invalid confirmation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sarah/health:
+    get:
+      operationId: sarahHealthCheck
+      tags: [sarah]
+      summary: Check Sarah service health
+      responses:
+        "200":
+          description: Sarah health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SarahHealth"
+
+  /sarah/jobs/{id}:
+    get:
+      operationId: getSarahJob
+      tags: [sarah]
+      summary: Get Sarah job status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SarahJob"
+
+  /sarah/jobs/{id}/retry:
+    post:
+      operationId: retrySarahJob
+      tags: [sarah]
+      summary: Retry a failed Sarah job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Retry initiated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SarahJob"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+
+    SuccessResponse:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        message:
+          type: ["string", "null"]
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+
+    # Auth schemas
+    RegisterInput:
+      type: object
+      required: [name, email, password]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+        password:
+          type: string
+          minLength: 8
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    ForgotPasswordInput:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+
+    ResetPasswordInput:
+      type: object
+      required: [token, password]
+      properties:
+        token:
+          type: string
+        password:
+          type: string
+          minLength: 8
+
+    ChangePasswordInput:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
+
+    User:
+      type: object
+      required: [id, name, email, plan, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        plan:
+          type: string
+          enum: [guest, free, pro]
+        createdAt:
+          type: string
+          format: date-time
+
+    AuthResult:
+      type: object
+      required: [user, token]
+      properties:
+        user:
+          $ref: "#/components/schemas/User"
+        token:
+          type: string
+
+    # Certification schemas
+    Certification:
+      type: object
+      required: [id, name, code, category]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        category:
+          type: string
+        description:
+          type: ["string", "null"]
+
+    UserCertification:
+      type: object
+      required: [id, userId, certificationId, certification, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        certificationId:
+          type: string
+        certification:
+          $ref: "#/components/schemas/Certification"
+        examDate:
+          type: ["string", "null"]
+          format: date
+        weeklyHours:
+          type: ["integer", "null"]
+        confidenceLevel:
+          type: ["string", "null"]
+          enum: [beginner, intermediate, advanced, null]
+        attemptedBefore:
+          type: ["boolean", "null"]
+        preferredStyle:
+          type: ["string", "null"]
+        isPrimary:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    UserCertificationInput:
+      type: object
+      required: [certificationId]
+      properties:
+        certificationId:
+          type: string
+        examDate:
+          type: string
+          format: date
+        weeklyHours:
+          type: integer
+        confidenceLevel:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        attemptedBefore:
+          type: boolean
+        preferredStyle:
+          type: string
+        isPrimary:
+          type: boolean
+
+    UserCertificationUpdate:
+      type: object
+      properties:
+        examDate:
+          type: string
+          format: date
+        weeklyHours:
+          type: integer
+        confidenceLevel:
+          type: string
+          enum: [beginner, intermediate, advanced]
+        attemptedBefore:
+          type: boolean
+        preferredStyle:
+          type: string
+        isPrimary:
+          type: boolean
+
+    # Conversation schemas
+    Conversation:
+      type: object
+      required: [id, userId, title, mode, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        title:
+          type: string
+        mode:
+          type: string
+          enum: [learn, practice, review, mock_exam, study_plan]
+        certificationId:
+          type: ["string", "null"]
+        certificationName:
+          type: ["string", "null"]
+        isArchived:
+          type: boolean
+        messageCount:
+          type: integer
+        lastMessageAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ConversationInput:
+      type: object
+      properties:
+        title:
+          type: string
+        mode:
+          type: string
+          enum: [learn, practice, review, mock_exam, study_plan]
+        certificationId:
+          type: string
+
+    ConversationUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        mode:
+          type: string
+          enum: [learn, practice, review, mock_exam, study_plan]
+        isArchived:
+          type: boolean
+
+    # Message schemas
+    Message:
+      type: object
+      required: [id, conversationId, role, messageType, content, createdAt]
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        role:
+          type: string
+          enum: [user, assistant, system]
+        messageType:
+          type: string
+          enum: [text, system_notice, certification_selector, exam_date_prompt, quick_actions, question_card, answer_feedback, progress_update, study_plan, mock_exam_intro, mock_exam_result, upload_analysis, error]
+        content:
+          type: string
+        structuredData:
+          type: ["object", "null"]
+          additionalProperties: true
+        status:
+          type: string
+          enum: [sending, delivered, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+        uploadIds:
+          type: array
+          items:
+            type: string
+
+    SendMessageResult:
+      type: object
+      required: [userMessage, jobId]
+      properties:
+        userMessage:
+          $ref: "#/components/schemas/Message"
+        jobId:
+          type: string
+        sarahMessage:
+          $ref: "#/components/schemas/Message"
+
+    # Practice schemas
+    StudyModeInput:
+      type: object
+      required: [conversationId, mode]
+      properties:
+        conversationId:
+          type: string
+        mode:
+          type: string
+          enum: [learn, practice, review, mock_exam, study_plan]
+        certificationId:
+          type: string
+
+    StudySession:
+      type: object
+      required: [id, userId, conversationId, mode, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        conversationId:
+          type: string
+        mode:
+          type: string
+        status:
+          type: string
+          enum: [active, completed, abandoned]
+        certificationId:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    PracticeQuestion:
+      type: object
+      required: [id, certificationId, domain, topic, difficulty, prompt, options]
+      properties:
+        id:
+          type: string
+        certificationId:
+          type: string
+        domain:
+          type: string
+        topic:
+          type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+        prompt:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionOption"
+        correctAnswer:
+          type: ["string", "null"]
+        explanation:
+          type: ["string", "null"]
+
+    QuestionOption:
+      type: object
+      required: [id, text]
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+
+    AnswerInput:
+      type: object
+      required: [selectedOptionId, conversationId]
+      properties:
+        selectedOptionId:
+          type: string
+        confidenceLevel:
+          type: ["integer", "null"]
+          minimum: 1
+          maximum: 5
+        conversationId:
+          type: string
+        flagged:
+          type: boolean
+
+    AnswerResult:
+      type: object
+      required: [correct, feedbackMessage, masteryUpdate]
+      properties:
+        correct:
+          type: boolean
+        correctOptionId:
+          type: string
+        feedbackMessage:
+          type: string
+        explanation:
+          type: string
+        optionExplanations:
+          type: object
+          additionalProperties:
+            type: string
+        masteryUpdate:
+          type: object
+          additionalProperties: true
+        nextQuestionId:
+          type: ["string", "null"]
+
+    # Mock exam schemas
+    MockExamInput:
+      type: object
+      required: [certificationId]
+      properties:
+        certificationId:
+          type: string
+        questionCount:
+          type: integer
+          default: 50
+        timeLimitMinutes:
+          type: ["integer", "null"]
+
+    MockExam:
+      type: object
+      required: [id, userId, certificationId, status, questionCount, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        certificationId:
+          type: string
+        certificationName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [in_progress, submitted, graded]
+        questionCount:
+          type: integer
+        timeLimitMinutes:
+          type: ["integer", "null"]
+        startedAt:
+          type: ["string", "null"]
+          format: date-time
+        submittedAt:
+          type: ["string", "null"]
+          format: date-time
+        score:
+          type: ["number", "null"]
+        questions:
+          type: array
+          items:
+            $ref: "#/components/schemas/MockExamQuestion"
+        createdAt:
+          type: string
+          format: date-time
+
+    MockExamQuestion:
+      type: object
+      required: [id, questionNumber, prompt, options]
+      properties:
+        id:
+          type: string
+        questionNumber:
+          type: integer
+        prompt:
+          type: string
+        domain:
+          type: ["string", "null"]
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/QuestionOption"
+        selectedOptionId:
+          type: ["string", "null"]
+        flagged:
+          type: boolean
+        correctOptionId:
+          type: ["string", "null"]
+        explanation:
+          type: ["string", "null"]
+
+    MockExamAnswersInput:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [questionId, selectedOptionId]
+            properties:
+              questionId:
+                type: string
+              selectedOptionId:
+                type: string
+              flagged:
+                type: boolean
+
+    MockExamResult:
+      type: object
+      required: [examId, score, correctCount, totalCount, timeTakenSeconds]
+      properties:
+        examId:
+          type: string
+        score:
+          type: number
+        correctCount:
+          type: integer
+        totalCount:
+          type: integer
+        timeTakenSeconds:
+          type: ["integer", "null"]
+        domainBreakdown:
+          type: array
+          items:
+            type: object
+            required: [domain, correctCount, totalCount]
+            properties:
+              domain:
+                type: string
+              correctCount:
+                type: integer
+              totalCount:
+                type: integer
+        readinessUpdate:
+          type: ["number", "null"]
+
+    # Study plan schemas
+    StudyPlanInput:
+      type: object
+      required: [certificationId]
+      properties:
+        certificationId:
+          type: string
+        examDate:
+          type: ["string", "null"]
+          format: date
+        weeklyHoursAvailable:
+          type: integer
+
+    StudyPlan:
+      type: object
+      required: [id, userId, certificationId, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        certificationId:
+          type: string
+        certificationName:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [active, completed, superseded]
+        examDate:
+          type: ["string", "null"]
+          format: date
+        daysRemaining:
+          type: ["integer", "null"]
+        weeklyHoursAvailable:
+          type: ["integer", "null"]
+        weakDomains:
+          type: array
+          items:
+            type: string
+        strongDomains:
+          type: array
+          items:
+            type: string
+        milestones:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StudyPlanItem"
+        createdAt:
+          type: string
+          format: date-time
+
+    StudyPlanItem:
+      type: object
+      required: [id, studyPlanId, title, scheduledDate, durationMinutes, itemType, completed]
+      properties:
+        id:
+          type: string
+        studyPlanId:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        scheduledDate:
+          type: string
+          format: date
+        durationMinutes:
+          type: integer
+        itemType:
+          type: string
+          enum: [study, review, mock_exam, milestone]
+        domain:
+          type: ["string", "null"]
+        completed:
+          type: boolean
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+
+    StudyPlanUpdate:
+      type: object
+      properties:
+        weeklyHoursAvailable:
+          type: integer
+        examDate:
+          type: string
+          format: date
+
+    # Progress schemas
+    UserProgress:
+      type: object
+      required: [userId, readinessScore, questionsAnswered, accuracy, studyStreak, timeStudiedMinutes]
+      properties:
+        userId:
+          type: string
+        readinessScore:
+          type: number
+        questionsAnswered:
+          type: integer
+        correctAnswers:
+          type: integer
+        accuracy:
+          type: number
+        studyStreak:
+          type: integer
+        timeStudiedMinutes:
+          type: integer
+        completedSessions:
+          type: integer
+        mockExamScores:
+          type: array
+          items:
+            type: number
+        bestMockScore:
+          type: ["number", "null"]
+        certificationName:
+          type: ["string", "null"]
+        examDate:
+          type: ["string", "null"]
+
+    DomainMastery:
+      type: object
+      required: [domain, masteryScore, questionsAnswered, accuracy]
+      properties:
+        domain:
+          type: string
+        masteryScore:
+          type: number
+        questionsAnswered:
+          type: integer
+        accuracy:
+          type: number
+        trend:
+          type: string
+          enum: [improving, stable, declining]
+
+    ProgressEvent:
+      type: object
+      required: [id, userId, eventType, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        eventType:
+          type: string
+        description:
+          type: ["string", "null"]
+        data:
+          type: ["object", "null"]
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # Upload schemas
+    UploadMetadataInput:
+      type: object
+      properties:
+        conversationId:
+          type: string
+
+    Upload:
+      type: object
+      required: [id, userId, filename, mimeType, sizeBytes, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        conversationId:
+          type: ["string", "null"]
+        filename:
+          type: string
+        originalFilename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        status:
+          type: string
+          enum: [processing, ready, failed]
+        createdAt:
+          type: string
+          format: date-time
+
+    # Settings schemas
+    UserSettings:
+      type: object
+      required: [userId, name, email]
+      properties:
+        userId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        theme:
+          type: string
+          enum: [light, dark, system]
+        notificationsEnabled:
+          type: boolean
+        primaryCertification:
+          $ref: "#/components/schemas/UserCertification"
+
+    UserSettingsUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        theme:
+          type: string
+          enum: [light, dark, system]
+        notificationsEnabled:
+          type: boolean
+
+    DeleteAccountInput:
+      type: object
+      required: [confirmation]
+      properties:
+        confirmation:
+          type: string
+        password:
+          type: ["string", "null"]
+
+    # Sarah job schemas
+    SarahHealth:
+      type: object
+      required: [status, provider]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unavailable]
+        provider:
+          type: string
+          enum: [mock, tunnel]
+        latencyMs:
+          type: ["integer", "null"]
+        message:
+          type: ["string", "null"]
+
+    SarahJob:
+      type: object
+      required: [id, userId, requestType, status, createdAt]
+      properties:
+        id:
+          type: string
+        userId:
+          type: string
+        conversationId:
+          type: ["string", "null"]
+        requestType:
+          type: string
+        status:
+          type: string
+          enum: [queued, processing, completed, failed, cancelled]
+        attemptCount:
+          type: integer
+        errorMessage:
+          type: ["string", "null"]
+        startedAt:
+          type: ["string", "null"]
+          format: date-time
+        completedAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time

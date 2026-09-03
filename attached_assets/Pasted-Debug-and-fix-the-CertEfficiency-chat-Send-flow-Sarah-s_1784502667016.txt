@@ -1,0 +1,317 @@
+Debug and fix the CertEfficiency chat Send flow. Sarah’s API and Cloudflare Tunnel are already operational. Do not modify Sarah’s VM or tunnel configuration.
+
+## Current symptom
+
+When the user types a message and presses Send, no request reaches Sarah.
+
+The Sarah logs do not show:
+
+```text
+POST /v1/messages
+```
+
+Therefore, trace the complete application flow:
+
+```text
+Send button
+→ frontend submit handler
+→ Replit messages endpoint
+→ database message creation
+→ Sarah job creation
+→ TunnelSarahService
+→ POST /v1/messages
+```
+
+Identify the exact point where execution stops and fix it.
+
+## 1. Inspect the Send button
+
+Confirm the Send button:
+
+* Is not permanently disabled
+* Has a working `onClick` or form `onSubmit`
+* Is inside the correct form
+* Does not default to `type="button"` when form submission is expected
+* Does not trigger a page reload
+* Does not silently fail because the input is empty after trimming
+* Does not remain blocked by a stale loading state
+* Does not depend on an undefined conversation ID
+* Works when pressing Enter as well as clicking Send
+
+Add temporary frontend logging for:
+
+```text
+chat_submit_started
+conversation_id
+message_length
+mutation_started
+mutation_success
+mutation_error
+```
+
+Do not log the complete message body in production logs.
+
+## 2. Inspect the frontend mutation
+
+Find the mutation or API function used to send chat messages.
+
+Confirm it calls the real endpoint:
+
+```text
+POST /api/conversations/:conversationId/messages
+```
+
+Verify:
+
+* The correct conversation ID is used
+* The body matches the backend schema
+* `Content-Type: application/json` is set
+* The authenticated bearer token is attached
+* The request is not accidentally sent to `/v1/messages` directly from the browser
+* The request is not blocked by an incorrect base URL
+* Errors are surfaced to the UI instead of swallowed
+
+The browser must call the Replit backend. Only the Replit backend should call Sarah.
+
+## 3. Check browser network behavior
+
+Use the browser developer network logs or application logging to determine whether clicking Send creates an HTTP request.
+
+Report one of these outcomes:
+
+```text
+No request created
+Request created but blocked
+Request returns 401
+Request returns 404
+Request returns 400
+Request returns 500
+Request succeeds but Sarah dispatch does not occur
+```
+
+Capture:
+
+* Request URL
+* Method
+* Status
+* Response content type
+* Safe response body
+* Whether the request appears in backend logs
+
+## 4. Inspect the backend message route
+
+Inspect:
+
+```text
+POST /api/conversations/:conversationId/messages
+```
+
+Confirm it:
+
+1. Authenticates the user
+2. Confirms ownership of the conversation
+3. Validates the request
+4. Inserts the user message
+5. Creates a Sarah job
+6. Dispatches the job to `SarahService`
+7. Returns a valid response to the frontend
+
+Add structured logging around every stage:
+
+```text
+message_route_entered
+message_validated
+message_saved
+sarah_job_created
+sarah_dispatch_started
+sarah_dispatch_completed
+sarah_dispatch_failed
+```
+
+Include safe identifiers:
+
+* user ID
+* conversation ID
+* message ID
+* job ID
+* correlation ID
+
+Do not log secrets or full authorization headers.
+
+## 5. Check transaction boundaries
+
+Make sure the route is not returning immediately after saving the user message without dispatching Sarah.
+
+Check for issues such as:
+
+* Missing `await`
+* Early `return`
+* Dispatch code inside an unreachable branch
+* Mock-provider condition incorrectly selected
+* Background promise being abandoned
+* Transaction rollback
+* Exception swallowed by `.catch(() => {})`
+* Job created as `processing` but no worker consumes it
+* Job queue only running in development or only in deployed production
+
+If asynchronous dispatch is used, verify that the worker is actually running.
+
+## 6. Inspect Sarah provider selection
+
+Confirm the backend is using:
+
+```env
+SARAH_PROVIDER=tunnel
+SARAH_TUNNEL_URL=https://certefficiency.certefficiency.com
+```
+
+Log only the selected provider and sanitized hostname:
+
+```text
+provider=tunnel
+host=certefficiency.certefficiency.com
+```
+
+Never log the API key or signing secret.
+
+Confirm the route calls `TunnelSarahService.sendMessage()` and not:
+
+* `MockSarahService`
+* a disabled provider
+* a placeholder implementation
+* an uninitialized service
+* a stale singleton created before secrets loaded
+
+## 7. Inspect job execution
+
+Determine how Sarah jobs execute.
+
+If dispatch is synchronous:
+
+```text
+message route
+→ TunnelSarahService
+→ Sarah
+```
+
+Confirm the call is awaited.
+
+If dispatch is queued:
+
+```text
+message route
+→ create job
+→ worker claims job
+→ TunnelSarahService
+```
+
+Confirm:
+
+* Worker process is running
+* Polling loop is active
+* New jobs are claimable
+* Job status transitions are implemented
+* Failed jobs store an error
+* Completed jobs store Sarah’s response
+* The worker has access to the production secrets
+
+A job should transition:
+
+```text
+queued
+→ processing
+→ completed
+```
+
+or:
+
+```text
+queued
+→ processing
+→ failed
+```
+
+It must not remain indefinitely queued or processing.
+
+## 8. Verify conversation initialization
+
+Check whether sending is blocked because the conversation has not completed initialization.
+
+The application previously skipped Sarah’s opening message gracefully. Ensure that does not leave:
+
+* `conversation.sarahConversationId` null and required
+* an initialization flag false
+* a frontend `isReady` flag permanently false
+* the Send button disabled until an opening message exists
+
+CertEfficiency should still allow the first user message even if Sarah conversation initialization previously failed.
+
+The backend may initialize Sarah lazily on the first message.
+
+## 9. Fix UI state handling
+
+After the user submits:
+
+* Optimistically display or persist the user message
+* Clear the input only after the request is accepted
+* Show a sending state
+* Prevent duplicate submits while the same request is active
+* Show an actionable error on failure
+* Preserve the typed message if the request fails before saving
+* Poll or refetch the conversation while the Sarah job runs
+* Render Sarah’s response when completed
+
+Do not silently clear the input if no request was sent.
+
+## 10. End-to-end tests
+
+Add tests covering:
+
+1. Clicking Send calls the correct backend endpoint.
+2. Pressing Enter sends the message.
+3. Empty input does not send.
+4. Missing conversation ID produces a visible error.
+5. Authenticated message submission returns success.
+6. User message is written to the database.
+7. Sarah job is created.
+8. Tunnel provider is selected.
+9. `POST /v1/messages` is called.
+10. Sarah response is written to the conversation.
+11. Failed Sarah dispatch produces a retryable error.
+12. The Send button exits its loading state after failure.
+13. A conversation without a Sarah opening message can still send.
+14. The UI refetches and renders Sarah’s response.
+
+## Completion criteria
+
+The task is complete only when:
+
+1. Clicking Send creates a browser request.
+2. Replit receives `POST /api/conversations/:id/messages`.
+3. The user message is stored.
+4. A Sarah job is created.
+5. Replit calls:
+
+```text
+POST https://certefficiency.certefficiency.com/v1/messages
+```
+
+6. Sarah’s log shows the request.
+7. The job reaches `completed`.
+8. Sarah’s response is stored.
+9. Sarah’s response appears in the chat UI.
+
+## Completion report
+
+Provide:
+
+* Root cause
+* Frontend file changed
+* Backend file changed
+* Whether a worker was involved
+* Request URL used by the frontend
+* Sarah provider selected
+* Job status transitions observed
+* Sarah log confirmation
+* Final test count
+* Confirmation that a real message sent through the UI reached Sarah and rendered successfully

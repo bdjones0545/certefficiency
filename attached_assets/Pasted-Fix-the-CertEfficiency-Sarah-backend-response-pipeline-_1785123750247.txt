@@ -1,0 +1,262 @@
+Fix the CertEfficiency Sarah backend response pipeline.
+
+## Confirmed root cause area
+
+The infrastructure path is healthy:
+
+* Hermes works
+* xAI works
+* Sarah local and public health are HTTP 200
+* Sarah accepts authenticated requests
+* Sarah can return valid synchronous JSON
+* Cloudflare is healthy
+* The remaining verdict is:
+
+```text
+BLOCKED — REPLIT BACKEND FAILURE
+```
+
+The production browser flow still spins because the Replit backend is not reliably converting Sarah’s successful response into a completed job and persisted assistant message.
+
+## Canonical Sarah success response
+
+Sarah returns synchronous JSON shaped like:
+
+```json
+{
+  "message": {
+    "type": "assistant",
+    "content": "Sarah response text"
+  },
+  "actions": [],
+  "metadata": {
+    "correlationId": "uuid"
+  }
+}
+```
+
+The Replit adapter must read:
+
+```text
+response.message.content
+```
+
+Do not expect:
+
+```text
+response.content
+response.data.content
+response.assistantMessage
+response.result.message
+```
+
+unless a deliberate normalization layer wraps the canonical response.
+
+## Required investigation
+
+Trace one production message through these exact checkpoints:
+
+1. Outbound Sarah HTTP status and response-body parse
+2. Sarah job row status transitions
+3. Assistant message row for the canonical `conversationId`
+4. `GET /api/sarah/jobs/:id` response
+5. `GET /api/conversations/:id/messages` response
+
+Use one correlation ID across the entire flow.
+
+Do not log message content, HMAC values, tokens, cookies, or authorization headers.
+
+## Required fix
+
+On a valid Sarah HTTP `200` response:
+
+1. Parse and validate the response body.
+2. Extract:
+
+```text
+message.type
+message.content
+metadata.correlationId
+```
+
+3. Require `message.content` to be a non-empty string.
+4. Persist an assistant message with:
+
+```text
+role = assistant
+content = response.message.content
+conversationId = canonical conversation ID
+correlationId = response.metadata.correlationId
+```
+
+5. Mark the Sarah job:
+
+```text
+status = completed
+completedAt = current timestamp
+error = null
+```
+
+6. Return a stable completed-job response to the client.
+7. Ensure `GET /api/conversations/:id/messages` immediately includes the persisted assistant message.
+8. Ensure the frontend job poller stops when status becomes `completed`.
+
+Perform the assistant-message insert and job completion transition in one transaction where supported.
+
+## Error response handling
+
+If Sarah returns HTTP `200` but:
+
+* `message.type === "error"`
+* `metadata.degraded === true`
+* the content is a structured fallback
+
+persist the visible message instead of leaving the job pending.
+
+Use the product’s intended distinction:
+
+* usable fallback response → persist assistant message and mark completed, with degraded metadata
+* genuine unrecoverable error → mark failed and expose a visible retryable error
+
+Do not leave a job in `queued` or `processing` after any terminal Sarah response.
+
+## Invalid or non-200 Sarah responses
+
+For:
+
+* invalid JSON
+* missing `message`
+* missing or empty `message.content`
+* HTTP 4xx
+* HTTP 5xx
+* request timeout
+* connection failure
+
+mark the job:
+
+```text
+status = failed
+failedAt = current timestamp
+safeErrorCode = bounded stable code
+```
+
+Return a visible user-safe error.
+
+Do not expose raw upstream errors or secrets.
+
+## Bounded timeout
+
+Add a terminal job timeout so the UI can never spin forever.
+
+Requirements:
+
+* queued and processing jobs must have a maximum age
+* once the age is exceeded, transition the job to `failed`
+* return a visible retryable timeout message
+* polling must terminate on `completed` or `failed`
+* retries must not duplicate the user message
+* stale jobs must not remain permanently active
+
+Use the existing Sarah request budget as the basis. Do not create an excessively long timeout.
+
+## Conversation identity
+
+Confirm the same canonical `conversationId` is used for:
+
+* user message
+* Sarah outbound request
+* Sarah job row
+* persisted assistant message
+* messages retrieval
+* frontend active conversation
+
+Reject or repair any temporary-ID/server-ID mismatch.
+
+## Observability
+
+Add structured events for:
+
+```text
+sarah.request.started
+sarah.response.received
+sarah.response.parsed
+sarah.assistant.persisted
+sarah.job.completed
+sarah.job.failed
+sarah.job.timed_out
+```
+
+Include only safe fields:
+
+* correlationId
+* conversationId
+* jobId
+* HTTP status
+* duration
+* message type
+* degraded boolean
+* safe error code
+
+## Required tests
+
+Add regression tests covering:
+
+1. Sarah `200` with valid `message.content`
+2. Assistant message persisted with `role=assistant`
+3. Job transitions `queued → processing → completed`
+4. Job endpoint returns `completed`
+5. Conversation messages endpoint includes assistant reply
+6. Sarah `200` degraded fallback is still visible
+7. Sarah `200` malformed body marks job failed
+8. Sarah `500` marks job failed
+9. Sarah timeout marks job failed
+10. Stale processing job times out
+11. Poller terminates on failed job
+12. Retry does not duplicate the user message
+13. Assistant message and job completion are transactionally consistent
+14. Canonical conversation ID is preserved throughout
+
+## Production acceptance test
+
+Using the deployed CertEfficiency application:
+
+1. Create a new conversation.
+2. Send one real message.
+3. Confirm Sarah returns HTTP `200`.
+4. Confirm the assistant row exists in the database.
+5. Confirm the job becomes `completed`.
+6. Confirm the job endpoint returns completed.
+7. Confirm the messages endpoint includes the assistant.
+8. Confirm Sarah’s response visibly renders in the browser.
+9. Repeat in an existing conversation.
+10. Trigger one controlled fallback and confirm it also visibly renders.
+
+Do not return `FIXED` based only on unit tests or a direct Sarah API request.
+
+## Final report
+
+Return:
+
+* exact broken adapter behavior
+* files changed
+* database/job transitions before and after
+* Sarah response status
+* response parse result
+* assistant persistence result
+* job endpoint result
+* messages endpoint result
+* browser render result
+* tests added and passing
+* one production correlation ID
+
+Use exactly one verdict:
+
+```text
+FIXED
+BLOCKED — DATABASE PERSISTENCE FAILURE
+BLOCKED — JOB STATE FAILURE
+BLOCKED — FRONTEND POLLING FAILURE
+BLOCKED — DEPLOYMENT REQUIRED
+```
+
+Only return `FIXED` after Sarah’s response visibly appears inside the deployed CertEfficiency browser UI.

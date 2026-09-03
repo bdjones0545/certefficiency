@@ -1,0 +1,502 @@
+Complete the Cloudflare R2 integration for the CertEfficiency AI Agent Course now that all course videos have been uploaded.
+
+## Current R2 configuration
+
+Cloudflare R2 is working and all course videos are uploaded.
+
+Bucket:
+
+`aiagentcourse`
+
+Course media prefix:
+
+`courses/ai-agent-builder/`
+
+The lesson video object keys follow this pattern:
+
+```text
+courses/ai-agent-builder/lesson-1.mp4
+courses/ai-agent-builder/lesson-2.mp4
+courses/ai-agent-builder/lesson-3.mp4
+courses/ai-agent-builder/lesson-4.mp4
+courses/ai-agent-builder/lesson-5.mp4
+courses/ai-agent-builder/lesson-6.mp4
+courses/ai-agent-builder/lesson-7.mp4
+courses/ai-agent-builder/lesson-8.mp4
+courses/ai-agent-builder/lesson-9.mp4
+courses/ai-agent-builder/lesson-10.mp4
+courses/ai-agent-builder/lesson-11.mp4
+```
+
+Do not upload, rename, copy, move, or recreate the video files. They already exist in R2.
+
+## Objective
+
+Finish the production integration so all 11 AI Agent Course lessons securely stream from Cloudflare R2 inside CertEfficiency.
+
+The application must:
+
+1. Map each existing lesson record to its correct R2 object key.
+2. Keep the R2 bucket private.
+3. Verify authentication and course access before paid lesson playback.
+4. Generate short-lived presigned playback URLs server-side.
+5. Stream the videos directly from R2.
+6. Preserve Stripe enrollment, lifetime access, progress tracking, and the free preview lesson.
+7. Avoid creating duplicate courses or duplicate lessons.
+
+---
+
+## Inspect before modifying
+
+Before writing code:
+
+1. Inspect the current course schema.
+2. Inspect the lesson records already created for the AI Agent Course.
+3. Inspect the current video-player implementation.
+4. Inspect authentication and authorization.
+5. Inspect Stripe purchase and enrollment logic.
+6. Inspect existing migrations.
+7. Inspect whether an R2 storage service was already partially implemented from the previous task.
+
+Extend the current architecture instead of rebuilding working functionality.
+
+Report any mismatch between the number of existing lessons and the 11 uploaded R2 objects.
+
+---
+
+## Environment variables
+
+Use server-only environment variables:
+
+```env
+CLOUDFLARE_R2_ACCOUNT_ID=
+CLOUDFLARE_R2_ACCESS_KEY_ID=
+CLOUDFLARE_R2_SECRET_ACCESS_KEY=
+CLOUDFLARE_R2_BUCKET=aiagentcourse
+CLOUDFLARE_R2_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+R2_SIGNED_URL_EXPIRATION_SECONDS=900
+```
+
+Use:
+
+```text
+region: auto
+```
+
+Never expose these credentials to the frontend.
+
+Never include the credentials in:
+
+* API responses
+* frontend bundles
+* logs
+* browser storage
+* source control
+* error messages
+
+Validate required configuration during server startup.
+
+---
+
+## R2 storage service
+
+Create or finish a reusable server-side Cloudflare R2 storage service using the AWS S3-compatible SDK.
+
+Use packages equivalent to:
+
+```text
+@aws-sdk/client-s3
+@aws-sdk/s3-request-presigner
+```
+
+The service should support typed methods such as:
+
+```ts
+getSignedPlaybackUrl(objectKey, expiresInSeconds)
+objectExists(objectKey)
+getObjectMetadata(objectKey)
+```
+
+Do not allow the frontend to submit arbitrary object keys.
+
+The playback endpoint must derive the object key from the authorized lesson record in the database.
+
+Validate object keys and reject values that:
+
+* start with `/`
+* contain `..`
+* contain backslashes
+* contain a protocol
+* reference a different bucket
+* fall outside approved course-media prefixes
+
+---
+
+## Database mapping
+
+Use the existing lesson records.
+
+Do not create a duplicate AI Agent Course.
+
+Do not create duplicate lessons.
+
+Add or use a field equivalent to:
+
+```text
+video_object_key
+```
+
+Map the existing lessons as follows:
+
+```text
+Lesson 1  → courses/ai-agent-builder/lesson-1.mp4
+Lesson 2  → courses/ai-agent-builder/lesson-2.mp4
+Lesson 3  → courses/ai-agent-builder/lesson-3.mp4
+Lesson 4  → courses/ai-agent-builder/lesson-4.mp4
+Lesson 5  → courses/ai-agent-builder/lesson-5.mp4
+Lesson 6  → courses/ai-agent-builder/lesson-6.mp4
+Lesson 7  → courses/ai-agent-builder/lesson-7.mp4
+Lesson 8  → courses/ai-agent-builder/lesson-8.mp4
+Lesson 9  → courses/ai-agent-builder/lesson-9.mp4
+Lesson 10 → courses/ai-agent-builder/lesson-10.mp4
+Lesson 11 → courses/ai-agent-builder/lesson-11.mp4
+```
+
+Create an idempotent migration or seed update.
+
+Running the migration more than once must not create duplicate lessons or overwrite unrelated lesson content.
+
+Store only the object key.
+
+Do not store:
+
+* permanent public URLs
+* presigned URLs
+* credentials
+* expiring query parameters
+
+---
+
+## Verify all uploaded objects
+
+Create a secure server-side verification script or administrative command that checks all 11 expected R2 objects using `HeadObject`.
+
+The verification should confirm:
+
+* the object exists
+* the object is readable by the server credentials
+* the object has a nonzero file size
+* the content type is compatible with video playback
+
+Expected content type should normally be:
+
+```text
+video/mp4
+```
+
+If an object exists but its content type is missing or incorrect, report it clearly. Do not silently make the bucket public.
+
+Produce a verification result for all 11 lessons.
+
+---
+
+## Secure playback endpoint
+
+Create or finish an authenticated backend endpoint following the project’s existing API conventions.
+
+Example:
+
+```text
+POST /api/courses/:courseId/lessons/:lessonId/playback
+```
+
+The endpoint must:
+
+1. Resolve the authenticated user.
+2. Load the requested course.
+3. Load the requested lesson.
+4. Confirm the lesson belongs to that course.
+5. Read the object key from the database.
+6. Confirm the object key is valid.
+7. Verify the user has access.
+8. Generate a short-lived presigned R2 GET URL.
+9. Return the minimum required playback information.
+
+Example response:
+
+```json
+{
+  "playbackUrl": "short-lived-presigned-url",
+  "expiresIn": 900
+}
+```
+
+Do not return credentials, internal authorization rules, or storage configuration.
+
+---
+
+## Access rules
+
+Preserve the existing product behavior.
+
+Lesson 1 should remain the free preview lesson.
+
+Paid lessons should require valid course access.
+
+Access may be granted when:
+
+* the lesson is the designated free preview
+* the authenticated user has a valid enrollment
+* the authenticated user has a completed Stripe purchase granting lifetime access
+* the user has an authorized administrative role
+
+Do not trust:
+
+* frontend lock state
+* client-provided enrollment values
+* client-provided Stripe status
+* route visibility
+* a client-provided object key
+
+Authorization must happen on the server for every playback request.
+
+Use controlled `403` or `404` responses where appropriate to avoid leaking private lesson information.
+
+---
+
+## Course-player integration
+
+Update the existing course player so it does not use local assets, browser-upload URLs, or permanent video URLs.
+
+Required flow:
+
+```text
+Student opens lesson
+→ frontend requests playback access
+→ backend verifies authorization
+→ backend generates a short-lived R2 URL
+→ frontend assigns the URL to the video player
+→ Cloudflare R2 streams the video
+```
+
+Frontend requirements:
+
+* show a loading state
+* show a retry state on failure
+* avoid creating a new signed URL on every render
+* clear the URL when changing lessons
+* clear the URL on logout
+* refresh the URL when expired
+* handle expired-signature playback failures
+* do not log the signed URL
+* do not place the signed URL in analytics
+* do not persist the signed URL in local storage
+* do not expose the R2 object key unnecessarily in public UI
+
+Preserve the current Apple-style design and responsive behavior.
+
+---
+
+## Video playback requirements
+
+Confirm the player supports:
+
+* seeking
+* pause and resume
+* fullscreen
+* mobile playback
+* desktop playback
+* progress tracking
+* lesson completion at the existing 90% threshold
+* resuming from saved progress if already supported
+
+Do not mark a lesson complete merely because a signed URL was generated.
+
+Completion must remain based on actual playback progress.
+
+Prevent duplicate progress events from causing incorrect completion percentages.
+
+---
+
+## Preserve existing functionality
+
+Do not break:
+
+* Stripe checkout
+* Stripe webhook processing
+* lifetime access
+* course enrollment
+* free Lesson 1 access
+* paid lesson locking
+* student dashboard
+* course navigation
+* lesson ordering
+* progress persistence
+* completion tracking
+* thumbnails
+* course metadata
+* authentication
+* administrator access
+* responsive layouts
+* current API response conventions
+
+Do not replace the current authentication or Stripe system unless a confirmed defect requires a targeted fix.
+
+---
+
+## Security hardening
+
+Implement these protections:
+
+* private R2 bucket
+* server-only credentials
+* short-lived presigned URLs
+* authorization before every signed URL
+* playback endpoint rate limiting
+* object-key prefix validation
+* no arbitrary object-key input
+* no signed URL persistence
+* no signed URL logging
+* no credentials in error messages
+* no secrets in frontend bundles
+* generic unauthorized responses
+* request correlation IDs
+* safe structured logs
+* protection against path traversal
+* protection against lesson/course ID mismatch
+* protection against unauthorized course enumeration
+
+---
+
+## Structured logging
+
+Add safe structured events:
+
+```text
+course.playback.requested
+course.playback.authorized
+course.playback.denied
+course.playback.url_generated
+course.playback.failed
+course.media.verification.started
+course.media.verification.completed
+course.media.verification.failed
+```
+
+Safe fields may include:
+
+* user ID
+* course ID
+* lesson ID
+* object-key fingerprint or sanitized object key
+* correlation ID
+* authorization result
+* denial reason code
+* URL expiration duration
+* object size
+* content type
+
+Never log:
+
+* presigned URLs
+* access keys
+* secret keys
+* session tokens
+* Stripe payment data
+* authentication headers
+
+---
+
+## Automated tests
+
+Add tests covering at least:
+
+1. All 11 existing lessons have the expected object keys.
+2. No duplicate lesson records are created.
+3. The migration is idempotent.
+4. Unauthenticated users cannot access paid lessons.
+5. Non-enrolled users cannot access paid lessons.
+6. The free preview lesson remains accessible according to current product behavior.
+7. Enrolled users can request playback URLs.
+8. Lifetime purchasers retain access.
+9. Administrators can access lessons.
+10. A lesson cannot be accessed through the wrong course ID.
+11. Arbitrary object keys cannot be supplied by the client.
+12. Invalid database object keys are rejected.
+13. Missing object keys return controlled errors.
+14. Signed URLs use the configured expiration.
+15. Signed URLs are never persisted.
+16. Signed URLs are never logged.
+17. R2 credentials are not exposed to the frontend.
+18. Progress tracking still works.
+19. The 90% completion threshold still works.
+20. Stripe enrollment logic still works.
+21. Playback URL refresh works after expiration.
+22. Repeated renders do not generate excessive signed URLs.
+23. The standard test suite does not require live R2 credentials.
+24. R2 calls are mocked in unit tests.
+25. The optional verification script can validate the live R2 objects separately.
+
+---
+
+## End-to-end verification
+
+Before declaring this complete:
+
+1. Apply the database migration.
+2. Confirm the existing AI Agent Course still has exactly 11 lessons.
+3. Confirm each lesson maps to the correct object key.
+4. Run the R2 object verification for all 11 videos.
+5. Confirm all 11 objects exist and have nonzero size.
+6. Confirm the application builds.
+7. Run all existing tests.
+8. Run all new tests.
+9. Sign in as an enrolled user.
+10. Play Lesson 1.
+11. Play at least one paid lesson.
+12. Seek within the video.
+13. Confirm progress saves.
+14. Confirm the lesson completes at the existing threshold.
+15. Sign in as a non-enrolled user.
+16. Confirm paid lessons remain locked.
+17. Confirm direct playback endpoint calls are denied.
+18. Confirm the bucket remains private.
+19. Confirm no secrets appear in the browser bundle.
+20. Confirm no presigned URLs appear in logs.
+21. Confirm Stripe checkout and lifetime enrollment remain operational.
+
+Do not mark this production-ready based only on compilation or mocked tests.
+
+Provide evidence from:
+
+* migration results
+* object verification
+* automated tests
+* build output
+* authenticated playback
+* unauthorized playback denial
+* progress tracking
+* secret-exposure checks
+
+---
+
+## Final report
+
+At completion, report:
+
+1. Files created
+2. Files modified
+3. Database migration added
+4. Lesson records updated
+5. API endpoints added or changed
+6. R2 service methods added
+7. Environment variables required
+8. Tests added
+9. Total test results
+10. Build result
+11. R2 verification result for each of the 11 lessons
+12. Enrolled-user playback result
+13. Unauthorized-user denial result
+14. Any remaining production risks
+
+Do not make the R2 bucket public and do not recreate the uploaded videos.

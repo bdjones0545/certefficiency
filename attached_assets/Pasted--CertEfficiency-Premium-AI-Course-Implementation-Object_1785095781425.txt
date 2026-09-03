@@ -1,0 +1,335 @@
+# CertEfficiency Premium AI Course Implementation
+
+## Objective
+
+Create a premium course platform inside CertEfficiency for my first AI course:
+
+# **How to Build an AI Agent**
+
+This course should feel like a premium educational experience similar to MasterClass, Coursera, or Apple Training—not simply a page with embedded videos.
+
+The first lesson should be completely free as a teaser. Every remaining lesson should be locked behind a Stripe checkout.
+
+The purchase price is **$497**.
+
+The Stripe account is **Efficiency Strength Training**.
+
+---
+
+# User Experience
+
+Create a new navigation item:
+
+**AI Agent Course**
+
+This should become its own premium learning experience.
+
+The design language should be modern, clean, minimal, and Apple-inspired.
+
+---
+
+# Hero Section
+
+Large hero image/video.
+
+Title:
+
+**How to Build an AI Agent**
+
+Subtitle:
+
+Learn how to design, build, deploy, and manage production-ready AI agents using the exact architecture I use in my own business.
+
+Description:
+
+This course teaches far more than prompting.
+
+You'll build a complete AI worker with identity, memory, skills, tools, persistent infrastructure, secure networking, and real-world business applications.
+
+Primary Button
+
+▶ Watch Free Lesson
+
+Secondary Button
+
+🔓 Unlock Full Course — $497
+
+---
+
+# Free Lesson
+
+Lesson 1 is completely free.
+
+Embed the first HeyGen lesson directly.
+
+Display underneath:
+
+Lesson 1
+
+Introduction
+
+Estimated Duration
+
+Course Overview
+
+Instructor Notes
+
+Automatically save viewing progress.
+
+---
+
+# Premium Paywall
+
+When Lesson 1 finishes—or when the user attempts to open any other lesson—display a premium paywall.
+
+The background should blur while showing the remaining lessons.
+
+Display a premium lock animation.
+
+Headline:
+
+**You've completed the free lesson.**
+
+Body:
+
+Continue building your own production-ready AI agent by unlocking the complete course.
+
+Included:
+
+✅ 10 Complete Lessons
+
+✅ Production Architecture
+
+✅ Hermes Integration
+
+✅ Agent Skills
+
+✅ Memory Systems
+
+✅ VM Deployment
+
+✅ Cloudflare Tunnel
+
+✅ Obsidian Knowledge Vault
+
+✅ Real Business Workflows
+
+✅ Future Course Updates
+
+Price:
+
+# **$497 Lifetime Access**
+
+Large CTA:
+
+Unlock Full Course
+
+---
+
+# Stripe Checkout
+
+Clicking Unlock Full Course should:
+
+Create a Stripe Checkout Session
+
+Redirect to Stripe
+
+Business:
+
+Efficiency Strength Training
+
+Amount:
+
+$497
+
+On success:
+
+/course/success
+
+On cancel:
+
+Return to
+
+/course
+
+Use Stripe webhooks to verify successful payment before granting access.
+
+Never trust the client.
+
+---
+
+# Course Curriculum
+
+Display all lessons in a premium curriculum.
+
+Lesson 1
+
+Introduction (FREE)
+
+Lesson 2
+
+Planning Your AI Worker
+
+Lesson 3
+
+Building the Foundation
+
+Lesson 4
+
+Creating the Agent Identity
+
+Lesson 5
+
+Adding Skills & Memory
+
+Lesson 6
+
+Connecting Tools
+
+Lesson 7
+
+Persistent Infrastructure
+
+Lesson 8
+
+Internet Access & Cloudflare Tunnel
+
+Lesson 9
+
+Production Deployment
+
+Lesson 10
+
+Final Build & Real-World Applications
+
+Lessons 2–10 remain locked until payment.
+
+---
+
+# Dashboard
+
+Purchased users should have a learning dashboard.
+
+Display:
+
+Current Lesson
+
+Continue Watching
+
+Lessons Completed
+
+Overall Progress
+
+Completion Percentage
+
+Estimated Time Remaining
+
+Resume where they left off
+
+Automatically mark lessons complete after 90% watched.
+
+---
+
+# Database
+
+Create reusable tables for future courses.
+
+courses
+
+* id
+* title
+* description
+* instructor
+* price
+* thumbnail
+* published
+
+course_lessons
+
+* id
+* course_id
+* title
+* description
+* video_url
+* duration
+* order
+* free_preview
+
+course_enrollments
+
+* id
+* user_id
+* course_id
+* stripe_customer_id
+* payment_status
+* purchase_date
+
+lesson_progress
+
+* id
+* user_id
+* lesson_id
+* watched_seconds
+* completed
+* last_viewed
+
+Design this so future AI courses can be added without rebuilding the platform.
+
+---
+
+# Security
+
+Premium videos must never be publicly accessible.
+
+Validate enrollment server-side before returning premium lesson URLs.
+
+Protect all lesson endpoints.
+
+Grant access only after Stripe webhook confirmation.
+
+---
+
+# Design
+
+Use Apple's Human Interface Guidelines.
+
+Large typography.
+
+Premium spacing.
+
+Rounded cards.
+
+Elegant gradients.
+
+Glassmorphism where appropriate.
+
+Smooth transitions.
+
+Excellent mobile experience.
+
+Fast loading.
+
+Professional onboarding.
+
+The experience should feel like purchasing a premium executive education program—not simply watching videos.
+
+---
+
+# Future Scalability
+
+This is only the first premium course.
+
+Architect the platform to support:
+
+* Multiple AI courses
+* Certification programs
+* Different instructors
+* Bundles
+* Course categories
+* Coupons
+* Promotional pricing
+* Certificates of completion
+* Student analytics
+* Future community features
+
+The goal is to make CertEfficiency a scalable premium learning platform capable of hosting many high-quality courses while providing a polished, production-ready user experience from day one.

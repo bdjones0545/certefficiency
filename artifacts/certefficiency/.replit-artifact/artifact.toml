@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "CertEfficiency"
+version = "1.0.0"
+id = "artifacts/certefficiency"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25275
+
+[services.development]
+run = "pnpm --filter @workspace/certefficiency run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/certefficiency", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/certefficiency/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25275"
+BASE_PATH = "/"

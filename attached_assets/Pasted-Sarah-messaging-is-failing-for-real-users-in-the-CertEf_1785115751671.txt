@@ -1,0 +1,146 @@
+Sarah messaging is failing for real users in the CertEfficiency app. Diagnose and fix the live production failure.
+
+Do not assume the recent audit means the messaging flow is working. Reproduce the failure through the actual frontend and trace the request end to end.
+
+## Scope
+
+Trace:
+
+CertEfficiency frontend
+→ Replit API route
+→ authentication/session
+→ conversation lookup
+→ request validation
+→ Sarah dispatch
+→ Cloudflare Tunnel
+→ Hermes
+→ Sarah
+→ LLM
+→ Replit persistence
+→ frontend rendering
+
+## Required investigation
+
+1. Reproduce the failure from the production frontend using a test user.
+2. Capture:
+
+   * failed request URL
+   * HTTP method
+   * HTTP status
+   * response body
+   * safe error code
+   * correlation/reference ID
+   * browser console error
+   * CORS result
+3. Find the corresponding Replit server logs using the correlation ID.
+4. Determine whether the failure occurs:
+
+   * before dispatch
+   * during Hermes dispatch
+   * after Hermes responds
+   * during database persistence
+   * during frontend response parsing/rendering
+
+## Check these likely regressions
+
+* `NODE_ENV=production` changed cookie or session behavior
+* secure cookies are not being sent
+* trusted proxy configuration is missing behind Replit
+* `ALLOWED_ORIGINS` excludes the actual frontend origin
+* credentials are missing from `fetch`
+* CSRF/origin validation rejects the browser request
+* frontend is calling an outdated Sarah route
+* request payload no longer matches `SendMessageBody`
+* `content` is missing, empty, or stored under the wrong field
+* conversation ID is missing or stale
+* user does not own the conversation
+* idempotency key is missing or reused incorrectly
+* Sarah timeout is shorter in the route than the configured 120 seconds
+* Hermes returns a valid body that Replit parses incorrectly
+* Sarah response succeeds but database persistence fails
+* response shape differs from what the frontend expects
+* frontend clears the draft before success
+* frontend displays a generic error while hiding the real safe error code
+
+## Production session and cookie verification
+
+Because `NODE_ENV=production` was just enabled, inspect the live session configuration.
+
+Verify:
+
+* `app.set("trust proxy", 1)` or an equivalent safe proxy configuration is active where required
+* session cookies use `secure: true` in production
+* cookies are actually set and returned in the deployed browser
+* `sameSite` matches the deployment topology
+* cookie domain is not incorrectly restricted
+* frontend requests use `credentials: "include"` where required
+* no development-only auth fallback was previously masking the issue
+
+Do not disable secure cookies as a shortcut.
+
+## CORS verification
+
+Identify the exact browser origin from the failed request.
+
+Compare it to `ALLOWED_ORIGINS`.
+
+Test the actual origin, including any deployed Replit hostname if the frontend currently runs there.
+
+Do not add wildcard CORS. Add only a legitimate production origin when required.
+
+## Logging
+
+Add or verify structured logs at these stages:
+
+* `sarah.message.requested`
+* `sarah.auth.completed`
+* `sarah.conversation.authorized`
+* `sarah.dispatch.started`
+* `sarah.dispatch.completed`
+* `sarah.persistence.completed`
+* `sarah.message.failed`
+
+Each log should include:
+
+* correlation ID
+* user ID
+* conversation ID
+* idempotency-key fingerprint
+* failure stage
+* safe error code
+* HTTP status
+* elapsed time
+
+Do not log message content, cookies, API keys, or signing secrets.
+
+## Fix requirements
+
+Once the root cause is identified:
+
+1. Fix the actual production defect.
+2. Preserve secure production controls.
+3. Preserve the user's unsent message on failure.
+4. Prevent duplicate messages during retries.
+5. Return a safe, actionable error response with a reference ID.
+6. Add a regression test reproducing the exact failure.
+7. Run the complete Sarah test suite.
+8. Re-test from the live browser.
+9. Confirm the message and Sarah response persist after reload.
+10. Confirm a second message in the same conversation works.
+
+## Final response
+
+Return:
+
+1. Exact root cause
+2. HTTP status and error response observed
+3. Failure stage
+4. Files changed
+5. Security-sensitive behavior preserved
+6. Regression tests added
+7. Full test result
+8. Live browser result
+9. Persistence/reload result
+10. Any remaining blocker
+
+Do not report this as fixed based only on unit tests. A successful live browser message to Sarah is required.

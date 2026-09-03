@@ -1,0 +1,359 @@
+Fix and complete conversation management in the AI Agent Course chat interface.
+
+## Current problems
+
+The chat currently has three broken or missing behaviors:
+
+1. Existing chats cannot be selected.
+2. A newly created chat appears, but cannot be selected or opened.
+3. Chats cannot be deleted.
+
+Do not patch these as isolated button issues. Audit the complete conversation lifecycle across frontend state, routes, API contracts, database ownership, cache invalidation, and responsive layout.
+
+## Required behavior
+
+Users must be able to:
+
+* view their conversations
+* select any existing conversation
+* create a new conversation
+* automatically enter the newly created conversation
+* switch between conversations
+* delete a conversation
+* receive confirmation before deletion
+* return to another valid conversation after deletion
+* preserve the selected conversation after refresh
+* see messages belonging only to the active conversation
+
+## 1. Inspect the current architecture
+
+Identify:
+
+* conversation database table or storage model
+* conversation list endpoint
+* conversation creation endpoint
+* conversation detail endpoint
+* messages endpoint
+* conversation deletion endpoint, if one exists
+* frontend sidebar or chat-history component
+* active conversation state
+* routing strategy
+* React Query or cache keys
+* mobile conversation-menu behavior
+
+Report the current contracts before changing them.
+
+## 2. Canonical URL and selection model
+
+Use one canonical conversation ID string throughout the application.
+
+Prefer URL-based selection such as:
+
+```text
+/chat/:conversationId
+```
+
+or the project’s equivalent nested route.
+
+Selecting a conversation must:
+
+1. update the URL
+2. update the active conversation ID
+3. fetch that conversation’s messages
+4. visually mark it as selected
+5. close the mobile sidebar, when applicable
+6. clear stale loading and error states from the previous conversation
+
+Do not rely only on a temporary local `selectedConversation` object if the URL and cache can become inconsistent.
+
+## 3. Conversation list behavior
+
+Each conversation row must be an accessible interactive element.
+
+Required behavior:
+
+* clicking the row selects the conversation
+* keyboard Enter or Space can select it
+* selected row has a clear active state
+* long titles truncate safely
+* empty or untitled chats display a fallback such as `New chat`
+* delete control does not accidentally trigger row selection
+* loading and empty states are visible
+
+Do not nest invalid interactive elements such as a `<button>` inside another `<button>`.
+
+A safe structure is:
+
+```tsx
+<div role="button" tabIndex={0}>
+  <span>Conversation title</span>
+  <button type="button" aria-label="Delete conversation">
+    Delete
+  </button>
+</div>
+```
+
+Use the project’s existing component system and accessibility conventions.
+
+## 4. Creating a new chat
+
+When the user selects `New chat`:
+
+1. call the canonical create-conversation endpoint
+2. receive a conversation object containing a string ID
+3. insert or invalidate the conversation list
+4. navigate immediately to the new conversation’s route
+5. set it as active
+6. load an empty message state
+7. focus the composer
+8. prevent duplicate creation from double-clicking
+
+Normalize the response using the real API contract.
+
+Do not assume `response.id` if the backend returns:
+
+```text
+response.conversation.id
+response.data.id
+response.data.conversation.id
+```
+
+Correct the TypeScript type to match the actual backend response.
+
+Never pass the whole conversation object where a string ID is expected.
+
+## 5. Selecting a newly created chat
+
+The newly created conversation must be selectable immediately without a refresh.
+
+Check for these common defects:
+
+* new conversation missing from cached list
+* cache updated with a different response shape
+* click handler receives an object instead of an ID
+* route navigation uses `[object Object]`
+* row is visually rendered but covered by another element
+* pointer events disabled
+* stale memoized callback
+* new conversation marked temporary after server ID exists
+* list key uses array index instead of conversation ID
+
+Use:
+
+```tsx
+key={conversation.id}
+```
+
+not an array index.
+
+## 6. Delete API
+
+If a canonical delete endpoint does not exist, add:
+
+```text
+DELETE /api/conversations/:conversationId
+```
+
+Requirements:
+
+* authenticated user only
+* verify conversation ownership
+* return `404` for nonexistent or inaccessible conversations
+* delete or archive related messages according to the existing data model
+* prevent cross-user deletion
+* use a transaction
+* return a stable JSON response
+* create an audit event if the project already uses audit logging
+
+Determine whether hard deletion or soft deletion is more consistent with the current application. Do not leave orphaned message or Sarah job rows.
+
+## 7. Delete UI
+
+Add a visible delete action to each conversation row.
+
+Behavior:
+
+1. user clicks delete
+2. row selection does not fire
+3. confirmation dialog appears
+4. dialog includes the conversation title
+5. user can cancel
+6. confirm calls the delete endpoint
+7. list updates immediately after success
+8. deleted conversation cannot be reopened
+9. errors are displayed and retryable
+
+Do not delete immediately on the first click.
+
+## 8. Active conversation after deletion
+
+When deleting the currently active conversation:
+
+* navigate to the next available conversation, preferably the most recently updated
+* if none remain, create or display a clean empty-chat state
+* clear the deleted conversation’s messages from the active view
+* stop any Sarah polling job associated with the deleted conversation
+* prevent stale responses from being rendered into another conversation
+
+When deleting an inactive conversation, keep the current active chat open.
+
+## 9. Data integrity
+
+Verify conversation ownership and related records for:
+
+* messages
+* Sarah jobs
+* attachments
+* course context
+* timestamps
+* titles
+* archived or deleted state
+
+Ensure a deleted conversation does not remain visible through:
+
+```text
+GET /api/conversations
+GET /api/conversations/:id
+GET /api/conversations/:id/messages
+GET /api/sarah/jobs/:id
+```
+
+Do not allow late Sarah responses to recreate messages for a deleted conversation.
+
+## 10. Cache and state management
+
+Use stable cache keys such as:
+
+```ts
+["conversations"]
+["conversation", conversationId]
+["conversation-messages", conversationId]
+["sarah-job", jobId]
+```
+
+After create:
+
+* insert the new conversation or invalidate the list
+* navigate to its ID
+* initialize its messages cache
+
+After delete:
+
+* remove the conversation from list cache
+* remove its detail and message caches
+* cancel related queries and polling
+* navigate appropriately
+
+After selecting:
+
+* do not show messages from the previous conversation while the new one loads
+* do not share message arrays across IDs
+
+## 11. Preserve selection after refresh
+
+On browser refresh:
+
+* route conversation ID is treated as canonical
+* application validates that the conversation exists and belongs to the user
+* valid conversation opens automatically
+* invalid or deleted ID redirects to a valid conversation or the empty state
+* no infinite redirect loop occurs
+
+## 12. Mobile behavior
+
+On smaller screens:
+
+* conversation list opens in a drawer or existing mobile panel
+* selecting a conversation closes the panel
+* delete confirmation remains usable
+* chat composer remains accessible
+* rows and delete controls meet touch-target requirements
+* no horizontal overflow occurs
+
+## 13. Loading and error states
+
+Add bounded states for:
+
+* conversation list loading
+* conversation creation
+* conversation selection
+* message loading
+* conversation deletion
+* invalid conversation
+* empty conversation list
+
+The UI must never appear frozen.
+
+Disable only the relevant control during a mutation rather than disabling the entire chat application.
+
+## 14. Required tests
+
+Add regression tests covering:
+
+1. Existing conversation row is selectable.
+2. Selecting a conversation updates the route.
+3. Selected conversation loads only its messages.
+4. Newly created conversation is added to the list.
+5. Newly created conversation becomes active automatically.
+6. Newly created conversation remains selectable.
+7. Conversation IDs remain strings.
+8. No URL contains `[object Object]`.
+9. Delete action does not select the row.
+10. Delete requires confirmation.
+11. Cancel preserves the conversation.
+12. Confirm removes the conversation.
+13. Deleting the active chat selects the next valid chat.
+14. Deleting the final chat shows an empty state.
+15. Deleting an inactive chat preserves the active chat.
+16. Cross-user deletion is rejected.
+17. Related message and job handling follows the intended data policy.
+18. Refresh preserves the selected conversation.
+19. Invalid or deleted route ID recovers safely.
+20. Mobile selection closes the conversation drawer.
+21. Pending Sarah polling is canceled when its conversation is deleted.
+22. Late responses cannot repopulate a deleted conversation.
+
+## 15. Production acceptance test
+
+In the deployed application:
+
+1. Create three separate chats.
+2. Send a different message in each.
+3. Switch among all three chats.
+4. Confirm each chat shows only its own messages.
+5. Refresh while the second chat is active.
+6. Confirm the second chat remains active.
+7. Create a fourth chat.
+8. Confirm it opens immediately and can be reselected.
+9. Delete an inactive chat and confirm the active chat remains.
+10. Delete the active chat and confirm another valid chat opens.
+11. Delete all remaining chats and confirm the empty state works.
+12. Create a new chat from the empty state.
+13. Repeat selection and deletion on mobile viewport.
+
+## Final report
+
+Return:
+
+* root cause of selection failure
+* root cause of new-chat selection failure
+* whether conversation routing was changed
+* delete behavior chosen: hard delete or soft delete
+* files changed
+* API endpoints added or modified
+* database behavior
+* cache invalidation behavior
+* test count and results
+* deployed browser results for create, select, refresh, and delete
+
+Use exactly one verdict:
+
+```text
+FIXED — DEPLOYED AND BROWSER VERIFIED
+BLOCKED — CONVERSATION API FAILURE
+BLOCKED — FRONTEND SELECTION FAILURE
+BLOCKED — DELETE DATA POLICY REQUIRED
+BLOCKED — DEPLOYMENT REQUIRED
+```
+
+Do not return `FIXED` until existing chats, newly created chats, and deletion all work inside the deployed browser.

@@ -1,0 +1,1072 @@
+Perform a complete production-readiness audit of CertEfficiency’s connection to Hermes and the Sarah certification agent.
+
+## Objective
+
+Determine whether the full Replit → Hermes → Sarah workflow is genuinely production-ready.
+
+This audit must evaluate the entire integration, not only whether individual endpoints return successful responses.
+
+The production path is:
+
+```text
+CertEfficiency frontend
+→ CertEfficiency Replit backend
+→ Cloudflare Tunnel
+→ Hermes runtime on the VM
+→ Sarah agent profile
+→ Sarah’s skills, tools, memory, and knowledge
+→ structured response
+→ Replit backend
+→ CertEfficiency frontend
+```
+
+The audit must verify:
+
+* identity
+* authentication
+* authorization
+* request signing
+* routing
+* conversation lifecycle
+* message delivery
+* retries
+* idempotency
+* timeouts
+* persistence
+* observability
+* failure recovery
+* security
+* deployment configuration
+* user experience
+* production operations
+
+Do not assume that passing unit tests or receiving one successful response proves production readiness.
+
+---
+
+# Known context
+
+Sarah is the CertEfficiency certification tutor.
+
+The existing system may include:
+
+* Hermes running on an external VM
+* Cloudflare Tunnel between Replit and the VM
+* signed requests using HMAC and/or bearer authentication
+* Sarah-specific API routes
+* conversation creation
+* message sending
+* persistent conversation history
+* image or document upload capabilities
+* readiness and mastery tracking
+* certification-specific knowledge
+* structured response contracts
+* retries and correlation IDs
+
+Previous failures included:
+
+* new conversations failing to initialize
+* messages failing to send
+* frontend state clearing before a successful response
+* mismatched response shapes
+* conversation invalidation issues
+* potential similarities between Sarah and Stan integration failures
+
+Treat these as areas requiring explicit regression testing.
+
+---
+
+# Phase 1: Architecture inventory
+
+Before changing code, identify the current implementation.
+
+Document:
+
+1. Every frontend component that interacts with Sarah
+2. Every Replit backend route used for Sarah
+3. Every external Hermes endpoint called
+4. Every Cloudflare Tunnel hostname involved
+5. Every authentication mechanism
+6. Every environment variable required
+7. Every database table used
+8. Every queue, job, webhook, callback, or polling mechanism
+9. Every conversation and message identifier
+10. Every retry, timeout, and error-handling path
+11. Every file or image upload path
+12. Every health-check endpoint
+13. Every Sarah-specific configuration file or profile reference
+14. Every shared Hermes integration used by other agents
+
+Create an actual architecture map based on the repository.
+
+Do not infer architecture from filenames alone.
+
+---
+
+# Phase 2: Define the production contract
+
+Establish the canonical contract between CertEfficiency and Hermes.
+
+For each request type, document:
+
+* endpoint
+* HTTP method
+* authentication
+* required headers
+* request schema
+* response schema
+* timeout
+* retry policy
+* idempotency behavior
+* correlation ID behavior
+* expected error codes
+* safe user-facing error
+* persistence behavior
+
+At minimum, audit these workflows:
+
+```text
+Create conversation
+Send message
+Load conversation
+List conversations
+Create conversation from first message
+Retry failed message
+Upload image or document
+Send attachment with message
+Receive Sarah response
+Persist Sarah response
+Resume an existing conversation
+Start a new conversation
+Delete or archive a conversation, if supported
+```
+
+There must be one canonical request and response shape for each workflow.
+
+Remove or normalize conflicting legacy response formats.
+
+---
+
+# Phase 3: Identity and routing
+
+Verify that requests intended for Sarah cannot be routed to another Hermes agent.
+
+The Replit backend must explicitly resolve:
+
+* agent identity: Sarah
+* agent profile
+* certification context
+* organization or user context
+* conversation context
+* permissions
+* applicable knowledge sources
+* applicable skills
+* tool access
+
+Confirm that Sarah’s identity is not determined only by frontend input.
+
+The client must not be able to replace:
+
+* agent name
+* agent profile
+* Hermes profile path
+* system prompt
+* knowledge vault
+* tool permissions
+* callback destination
+* runtime target
+
+These must be resolved server-side from trusted configuration.
+
+Test that attempts to route requests to Stan, Kevin, Benji, or another profile through Sarah’s API are rejected or ignored.
+
+---
+
+# Phase 4: Authentication and request signing
+
+Audit the full authentication path between Replit and Hermes.
+
+Verify:
+
+* HTTPS is required
+* Cloudflare Tunnel is not bypassed
+* secrets remain server-only
+* HMAC or bearer credentials are not exposed to the browser
+* signatures are generated over a canonical payload
+* timestamps are included
+* replay windows are enforced
+* nonce or idempotency protections exist where appropriate
+* signature comparison is timing-safe
+* malformed signatures are rejected
+* expired signatures are rejected
+* missing authentication is rejected
+* logs never contain secrets
+* secret rotation is possible without a full rewrite
+
+If both HMAC and bearer authentication exist, document why both are needed and which is authoritative.
+
+Do not silently fall back to insecure authentication in production.
+
+Audit any setting equivalent to:
+
+```text
+ALLOW_INSECURE
+SKIP_SIGNATURE_CHECK
+DEV_HMAC
+DISABLE_AUTH
+```
+
+Production must fail closed.
+
+---
+
+# Phase 5: Environment and deployment configuration
+
+Inventory and validate all required production environment variables.
+
+Potential variables may include equivalents of:
+
+```text
+HERMES_BASE_URL
+HERMES_SARAH_ENDPOINT
+HERMES_API_KEY
+HERMES_HMAC_SECRET
+HERMES_CALLBACK_SECRET
+HERMES_TIMEOUT_MS
+HERMES_MAX_RETRIES
+SARAH_AGENT_ID
+SARAH_PROFILE
+SARAH_API_URL
+CLOUDFLARE_TUNNEL_HOST
+```
+
+Use the actual variable names found in the repository.
+
+For each variable, report:
+
+* where it is read
+* whether it is required
+* whether it has a default
+* whether the default is safe
+* whether it is present in Replit Secrets
+* whether it is exposed to the frontend
+* whether startup validates it
+* what happens when it is missing
+
+Production startup should not appear healthy when the Sarah integration is unusable.
+
+Implement one of these patterns:
+
+* fail startup when Sarah is a required production service
+* expose a degraded readiness state when Sarah is unavailable
+* disable Sarah UI with a clear service-unavailable state
+
+Do not allow the application to advertise Sarah as functional while the integration is unconfigured.
+
+---
+
+# Phase 6: Conversation lifecycle audit
+
+Audit the complete conversation lifecycle.
+
+## Conversation creation
+
+Verify:
+
+* a conversation receives one canonical ID
+* the ID is persisted before dependent messages are sent
+* duplicate clicks do not create duplicate conversations
+* create requests support idempotency
+* frontend and backend agree on the response shape
+* wrapped and unwrapped response formats are normalized
+* failures do not leave unusable empty conversations
+* failures do not incorrectly clear user input
+
+## First-message creation
+
+If a conversation can be created when the first message is sent:
+
+* creation and first-message delivery must be coordinated
+* the frontend must not depend on a race between separate calls
+* retries must not create duplicate conversations or duplicate messages
+* conversation lists must refresh after success
+* failed sends must preserve the user’s text
+
+## New conversation
+
+Verify that pressing “New Chat”:
+
+* creates or initializes the correct state
+* clears only the active local draft when appropriate
+* does not reuse the previous conversation ID
+* updates navigation
+* does not lose unsent text without warning
+* works after a previous request failed
+
+## Resume conversation
+
+Verify:
+
+* persisted messages load in the correct order
+* roles are preserved
+* attachments remain associated
+* Sarah receives enough history or a server-side summary
+* history length limits are handled safely
+* stale frontend state does not overwrite newer server state
+
+---
+
+# Phase 7: Message delivery and response handling
+
+Audit message sending from click to final render.
+
+Verify:
+
+1. User submits a message
+2. UI creates an explicit sending state
+3. Replit authenticates the user
+4. Replit verifies conversation ownership
+5. Replit generates a correlation ID
+6. Replit writes or reserves the user message
+7. Replit dispatches to Hermes
+8. Hermes acknowledges the request
+9. Sarah processes the request
+10. A response is returned or delivered asynchronously
+11. Replit validates the response
+12. Replit persists the assistant message
+13. The UI reconciles server state
+14. Loading indicators end
+15. Errors remain retryable
+
+The composer must not permanently clear the user’s message before the server accepts responsibility for it.
+
+If optimistic UI is used:
+
+* retain a recoverable copy
+* mark pending messages clearly
+* reconcile by stable message ID
+* prevent duplicate rendering
+* support retry
+
+Validate Sarah responses with a schema rather than trusting arbitrary JSON.
+
+Reject or safely handle:
+
+* empty responses
+* malformed responses
+* HTML where structured text is expected
+* unexpected agent identity
+* missing conversation IDs
+* missing message IDs
+* oversized responses
+* duplicate callbacks
+* stale callbacks
+
+---
+
+# Phase 8: Synchronous versus asynchronous execution
+
+Determine whether Sarah responses are:
+
+* synchronous
+* asynchronous through callbacks
+* job-based
+* polling-based
+* a hybrid
+
+Document the actual model.
+
+If synchronous:
+
+* set explicit connect and response timeouts
+* do not leave requests hanging indefinitely
+* distinguish timeout from rejection
+* ensure proxies and Replit request limits are respected
+
+If asynchronous:
+
+* persist a job before dispatch
+* return a stable job or message ID
+* validate callbacks
+* enforce callback idempotency
+* handle out-of-order callbacks
+* handle duplicate callbacks
+* handle callbacks after user logout
+* expose a recoverable pending state
+* provide polling or push updates
+* expire abandoned jobs safely
+
+Do not maintain ambiguous half-synchronous behavior where the frontend cannot determine whether Sarah accepted the request.
+
+---
+
+# Phase 9: Timeout, retry, and idempotency policy
+
+Define production policies for every network boundary.
+
+Audit:
+
+```text
+Browser → Replit
+Replit → Cloudflare Tunnel
+Cloudflare Tunnel → Hermes
+Hermes → Sarah
+Hermes callback → Replit
+Replit → database
+```
+
+For each boundary, define:
+
+* timeout
+* retry count
+* retryable errors
+* non-retryable errors
+* exponential backoff
+* jitter
+* idempotency key
+* maximum elapsed time
+
+Retries must not duplicate:
+
+* conversations
+* user messages
+* Sarah responses
+* mastery updates
+* usage records
+* billing-related actions
+* attachments
+
+Use stable idempotency keys based on trusted identifiers.
+
+Do not retry authentication failures, schema failures, or permission failures as transient errors.
+
+---
+
+# Phase 10: Database integrity
+
+Inspect all database tables involved in Sarah.
+
+Verify:
+
+* conversation ownership
+* message ownership
+* foreign keys
+* unique constraints
+* message ordering
+* idempotency constraints
+* status fields
+* created and updated timestamps
+* failure timestamps
+* retry counts
+* correlation IDs
+* external event IDs
+* agent identity
+* response version
+* attachment references
+
+Add database-level guards where application-level checks are insufficient.
+
+Potential invariants:
+
+* one conversation belongs to one user
+* a message belongs to the same user and conversation
+* one external Hermes event cannot create multiple assistant messages
+* one idempotency key cannot create multiple user messages
+* Sarah responses cannot be attached to another user’s conversation
+* deleted or archived conversations cannot accept new messages unless intentionally restored
+
+Use transactions for multi-step state changes.
+
+---
+
+# Phase 11: Authorization and tenant isolation
+
+Verify that users can access only their own:
+
+* conversations
+* messages
+* attachments
+* progress data
+* certification context
+* Sarah responses
+
+Test:
+
+* requesting another user’s conversation ID
+* changing message IDs
+* changing attachment IDs
+* changing course or certification IDs
+* replaying an old playback or callback request
+* guessing sequential identifiers
+* using a valid conversation with the wrong user session
+
+Use controlled `403` or `404` responses to avoid leaking resource existence.
+
+Administrative access must be explicit and logged.
+
+---
+
+# Phase 12: Sarah knowledge, skills, and memory
+
+Verify that a technically successful connection actually produces the correct Sarah behavior.
+
+Audit:
+
+* Sarah profile loads successfully
+* Sarah identity is stable
+* correct certification knowledge is loaded
+* correct skill set is active
+* required tools are available
+* forbidden tools are unavailable
+* memory persists where intended
+* one user’s memory cannot leak to another
+* one certification’s context cannot leak into another
+* new conversations start with the correct baseline context
+* resumed conversations restore the correct context
+* memory failures do not silently produce misleading answers
+
+Create a production verification set for Sarah.
+
+Include prompts that test:
+
+1. Sarah identifies her role correctly
+2. Sarah knows which certification is active
+3. Sarah uses the correct knowledge source
+4. Sarah does not claim access to unavailable systems
+5. Sarah remembers permitted conversation context
+6. Sarah does not recall another user’s information
+7. Sarah handles uncertainty appropriately
+8. Sarah refuses unsupported or unsafe requests where appropriate
+9. Sarah produces valid structured output when required
+10. Sarah remains consistent across multiple turns
+
+Do not use these as strict wording tests. Evaluate semantic behavior.
+
+---
+
+# Phase 13: Attachments and image uploads
+
+Audit the current image and file-upload workflow.
+
+Verify:
+
+* upload controls work on desktop and mobile
+* file type is validated server-side
+* file size is limited
+* filenames are sanitized
+* storage locations are private
+* signed access expires
+* Sarah receives the attachment reference
+* attachment ownership is verified
+* malicious content is not executed
+* unsupported files produce controlled errors
+* failed uploads do not create orphaned records
+* retries do not duplicate attachments
+* users cannot reference another user’s attachment ID
+
+Confirm whether Hermes receives:
+
+* raw file bytes
+* a signed URL
+* extracted text
+* image data
+* a storage object ID
+
+Document and secure the actual path.
+
+---
+
+# Phase 14: Cloudflare Tunnel and network reliability
+
+Audit the tunnel as production infrastructure.
+
+Verify:
+
+* the production hostname is correct
+* TLS is valid
+* Replit never calls a local or development hostname in production
+* the origin service is bound correctly
+* tunnel routes map only required endpoints
+* administrative Hermes endpoints are not exposed publicly
+* health endpoints do not leak secrets
+* request size limits support expected payloads
+* timeout settings support Sarah responses
+* Cloudflare Access or equivalent controls are used where appropriate
+* the origin cannot be reached directly from the public internet
+* tunnel restarts automatically
+* Hermes restarts automatically
+* Sarah profile loads after restart
+* service logs survive or are forwarded
+* DNS failures and tunnel outages produce controlled behavior
+
+Test actual failure conditions:
+
+* tunnel unavailable
+* Hermes unavailable
+* Sarah profile unavailable
+* VM restarting
+* DNS resolution failure
+* connection reset
+* slow response
+* invalid certificate or hostname mismatch, where testable safely
+
+---
+
+# Phase 15: Health, readiness, and degraded states
+
+Implement or audit distinct health concepts.
+
+## Liveness
+
+Confirms the Replit process is running.
+
+## Readiness
+
+Confirms the application can serve Sarah workflows.
+
+Readiness should evaluate at least:
+
+* database connectivity
+* required configuration
+* Hermes reachability
+* authentication configuration
+* Sarah profile availability
+* callback configuration if used
+
+## Deep diagnostic health
+
+Administrative only.
+
+May report:
+
+* tunnel status
+* Hermes status
+* Sarah status
+* last successful dispatch
+* last successful response
+* recent failure count
+* latency percentiles
+* queue depth
+* oldest pending request
+
+Do not expose sensitive diagnostics publicly.
+
+The frontend should show a clear degraded state when Sarah is unavailable instead of presenting a broken chat composer.
+
+---
+
+# Phase 16: Observability
+
+Add or verify safe structured logs for the complete workflow.
+
+Recommended events:
+
+```text
+sarah.conversation.create_requested
+sarah.conversation.created
+sarah.conversation.create_failed
+sarah.message.accepted
+sarah.message.persisted
+sarah.dispatch.requested
+sarah.dispatch.accepted
+sarah.dispatch.rejected
+sarah.dispatch.timed_out
+sarah.callback.received
+sarah.callback.duplicate
+sarah.response.validated
+sarah.response.persisted
+sarah.response.failed
+sarah.attachment.uploaded
+sarah.attachment.rejected
+sarah.conversation.loaded
+sarah.retry.requested
+sarah.retry.completed
+sarah.health.degraded
+sarah.health.restored
+```
+
+Include safe fields:
+
+* user ID
+* conversation ID
+* message ID
+* job ID
+* Hermes event ID
+* correlation ID
+* request attempt
+* status
+* safe error code
+* latency
+* response version
+* agent identifier
+
+Never log:
+
+* HMAC secrets
+* bearer tokens
+* authorization headers
+* full signed URLs
+* private attachments
+* full conversation content by default
+* certification answers containing sensitive user data
+* raw stack traces in user-facing responses
+
+Create dashboards or queries that make it possible to answer:
+
+* Is Sarah currently available?
+* What percentage of requests succeed?
+* What is median and p95 response time?
+* How many requests are pending?
+* How many requests timed out?
+* Are callbacks being duplicated?
+* Which failure stage is most common?
+* When was the last successful response?
+
+---
+
+# Phase 17: Error taxonomy
+
+Define stable internal error codes.
+
+Examples:
+
+```text
+SARAH_CONFIGURATION_MISSING
+SARAH_AUTHENTICATION_FAILED
+SARAH_SIGNATURE_REJECTED
+SARAH_CONVERSATION_NOT_FOUND
+SARAH_CONVERSATION_FORBIDDEN
+SARAH_MESSAGE_INVALID
+SARAH_DISPATCH_REJECTED
+SARAH_DISPATCH_TIMEOUT
+SARAH_RUNTIME_UNAVAILABLE
+SARAH_PROFILE_UNAVAILABLE
+SARAH_RESPONSE_INVALID
+SARAH_CALLBACK_INVALID
+SARAH_CALLBACK_DUPLICATE
+SARAH_ATTACHMENT_INVALID
+SARAH_RATE_LIMITED
+SARAH_PERSISTENCE_FAILED
+```
+
+Map these to safe user-facing messages.
+
+The user should see clear messages such as:
+
+* Sarah is temporarily unavailable.
+* Your message was not sent. Your text has been preserved.
+* This conversation could not be loaded.
+* The attachment type is not supported.
+* Sarah is taking longer than expected. You can retry without duplicating the message.
+
+Do not expose infrastructure details.
+
+---
+
+# Phase 18: Rate limiting and abuse controls
+
+Audit limits for:
+
+* conversation creation
+* message sending
+* retries
+* attachment uploads
+* health endpoints
+* callbacks
+* unauthenticated requests
+* per-user usage
+* per-IP usage
+
+Ensure limits do not accidentally block normal multi-turn tutoring.
+
+Protect against:
+
+* automated message floods
+* giant prompt payloads
+* rapid new-conversation creation
+* repeated failed authentication
+* attachment abuse
+* replay attacks
+* callback floods
+
+Return controlled `429` responses with retry guidance.
+
+---
+
+# Phase 19: Frontend production UX
+
+Audit the Sarah chat experience.
+
+Verify:
+
+* loading states are accurate
+* users can distinguish sending from waiting for Sarah
+* input is preserved on failure
+* retry does not duplicate messages
+* new chat works
+* conversation switching works
+* stale responses do not render in the wrong conversation
+* buttons are disabled only when necessary
+* the composer supports mobile
+* image upload works
+* error states are visible
+* pending messages survive navigation or refresh where intended
+* conversations refresh after creation
+* no raw JSON or internal errors appear
+* offline or degraded service states are understandable
+
+The frontend must use server state as authoritative.
+
+Do not allow local optimistic state to permanently diverge from persisted conversation history.
+
+---
+
+# Phase 20: Production smoke tests
+
+Create an executable production smoke-test script that uses safe test accounts and the deployed integration.
+
+It should verify:
+
+1. Replit readiness endpoint
+2. Hermes reachability
+3. Sarah profile availability
+4. Authentication rejection for an unsigned request
+5. Conversation creation
+6. First-message creation
+7. Message persistence
+8. Sarah response receipt
+9. Response schema validation
+10. Conversation reload
+11. Second-turn context retention
+12. New-conversation isolation
+13. Retry idempotency
+14. Duplicate-request protection
+15. Unauthorized conversation access denial
+16. Attachment upload, if supported
+17. Invalid attachment rejection
+18. Timeout behavior
+19. Degraded-state behavior
+20. Correlation ID traceability
+
+The smoke test must not modify real user conversations.
+
+Use a dedicated synthetic production-test user or isolated test tenant.
+
+---
+
+# Phase 21: Automated test requirements
+
+Add tests covering at least:
+
+1. Missing Hermes configuration
+2. Invalid Hermes hostname
+3. Missing HMAC secret
+4. Invalid signature
+5. Expired signature
+6. Replay attempt
+7. Successful conversation creation
+8. Duplicate conversation request
+9. Successful first-message flow
+10. Failed first-message flow preserves draft
+11. Successful message flow
+12. Duplicate message request
+13. Timeout behavior
+14. Retry after timeout
+15. Retry does not duplicate messages
+16. Malformed Hermes response
+17. Empty Sarah response
+18. Wrong agent identity in response
+19. Duplicate callback
+20. Out-of-order callback
+21. Unauthorized conversation access
+22. Cross-user isolation
+23. New chat after prior failure
+24. Conversation list invalidation
+25. Attachment upload success
+26. Attachment ownership rejection
+27. Unsupported attachment type
+28. Rate limiting
+29. Health degradation
+30. Health recovery
+31. Startup configuration validation
+32. Secret-exposure checks
+33. Correlation ID propagation
+34. Database transaction rollback
+35. Sarah semantic verification suite
+36. Existing certification progress behavior remains intact
+
+Use mocks for unit and integration tests.
+
+Use the live deployed Hermes connection only in a separate production smoke-test suite.
+
+---
+
+# Phase 22: Failure-injection testing
+
+Perform controlled failure tests in a non-user-impacting environment.
+
+Simulate:
+
+* Hermes returns 500
+* Hermes returns 429
+* Hermes times out
+* Hermes returns malformed JSON
+* Sarah profile is missing
+* callback is duplicated
+* callback arrives late
+* database write fails after dispatch
+* database write succeeds but frontend request disconnects
+* tunnel is unavailable
+* credentials are wrong
+* user retries rapidly
+* two browser tabs send simultaneously
+
+Document the result of each test.
+
+Confirm whether the system:
+
+* retries safely
+* preserves user text
+* avoids duplicates
+* reports the correct status
+* recovers automatically
+* leaves a traceable correlation ID
+
+---
+
+# Phase 23: Deployment and operations
+
+Audit how Hermes and Sarah stay operational.
+
+Document:
+
+* VM provider
+* service manager
+* Hermes process definition
+* Sarah profile location
+* environment-file location
+* file permissions
+* tunnel service definition
+* restart policies
+* boot persistence
+* log rotation
+* disk usage controls
+* backup policy
+* secret rotation process
+* deployment process
+* rollback process
+* monitoring
+* alerting
+* owner of production incidents
+
+Verify that:
+
+* Hermes starts after VM reboot
+* the tunnel starts after VM reboot
+* Sarah loads after Hermes restarts
+* configuration changes are versioned safely
+* secrets are not committed
+* logs cannot fill the disk indefinitely
+* failure alerts reach an actual operator
+
+Where Replit cannot directly verify VM configuration, clearly identify the evidence needed from the VM rather than marking it passed.
+
+---
+
+# Phase 24: Security review
+
+Audit for:
+
+* SSRF through configurable Hermes URLs
+* path traversal
+* arbitrary agent-profile selection
+* prompt injection that changes routing or permissions
+* insecure direct object references
+* cross-user data leakage
+* leaked secrets
+* overly permissive CORS
+* missing CSRF protection where relevant
+* replay attacks
+* unsigned callbacks
+* unrestricted callback hosts
+* open redirects
+* oversized payload denial of service
+* attachment malware risks
+* public administrative endpoints
+* unsafe development fallbacks
+* verbose production errors
+
+Do not claim the integration is secure merely because the tunnel uses HTTPS.
+
+---
+
+# Production readiness decision
+
+Use one of these exact final classifications:
+
+```text
+Production Ready
+Production Ready With Minor Risks
+Not Production Ready
+Unable to Verify
+```
+
+Use `Production Ready` only if there is evidence for:
+
+* live conversation creation
+* live message exchange
+* correct Sarah identity
+* authentication and signing
+* persistence
+* retry safety
+* idempotency
+* tenant isolation
+* health monitoring
+* failure recovery
+* deployed configuration
+* production smoke tests
+* operational restart behavior
+
+A clean build and passing mocked tests are not enough.
+
+---
+
+# Final report
+
+Return a detailed report with:
+
+1. Final classification
+2. Executive summary
+3. Architecture map
+4. Production request flow
+5. Files inspected
+6. Files created
+7. Files modified
+8. Environment variables
+9. Authentication findings
+10. Conversation lifecycle findings
+11. Message-delivery findings
+12. Retry and idempotency findings
+13. Database-integrity findings
+14. Authorization and tenant-isolation findings
+15. Sarah identity, knowledge, skill, and memory findings
+16. Attachment findings
+17. Cloudflare Tunnel findings
+18. Health and readiness findings
+19. Observability findings
+20. Security findings
+21. Automated test results
+22. Live smoke-test results
+23. Failure-injection results
+24. Build result
+25. Unverified VM-side requirements
+26. Blocking production risks
+27. Minor production risks
+28. Exact remediation plan
+29. Evidence required to upgrade the classification
+
+Report findings before implementing major architectural changes.
+
+Fix clear defects that can be safely corrected within the current architecture, but do not conceal the original audit findings after fixing them.
+
+Do not mark the connection production-ready without real end-to-end evidence from the deployed Replit application through Hermes to Sarah and back.

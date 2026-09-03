@@ -1,0 +1,145 @@
+Fix the CertEfficiency production frontend Sarah job-polling bug.
+
+## Confirmed state
+
+The backend Sarah pipeline is now verified:
+
+* Sarah job completes in approximately 12 seconds.
+* Assistant message is persisted with real Sarah content.
+* Conversation messages endpoint returns both user and assistant messages.
+* Backend test suite passes: 131 tests.
+* Stale jobs now fail instead of spinning forever.
+
+The remaining production bug is:
+
+```text
+GET /sarah/jobs/[object%20Object]
+```
+
+The deployed frontend is passing an object into the Sarah job polling URL instead of a UUID string.
+
+## Objective
+
+Fix the frontend so the polling hook receives and uses only the canonical Sarah `jobId` string.
+
+## Required investigation
+
+Inspect the production frontend flow for:
+
+* message mutation response
+* returned `jobId`
+* job polling hook
+* query key construction
+* fetch URL construction
+* TypeScript types for the send-message response
+* any wrapper such as `response.data`, `response.job`, or `response.jobId`
+
+Find where an object is being passed into code equivalent to:
+
+```ts
+fetch(`/api/sarah/jobs/${jobId}`)
+```
+
+## Required fix
+
+Normalize the mutation result immediately after the message POST.
+
+The canonical value passed to the polling hook must be a string UUID:
+
+```ts
+const jobId =
+  typeof result.jobId === "string"
+    ? result.jobId
+    : typeof result.job?.id === "string"
+      ? result.job.id
+      : null;
+```
+
+Adapt this to the actual response shape rather than blindly using this example.
+
+The polling hook must accept:
+
+```ts
+jobId: string | null
+```
+
+It must never accept an object.
+
+Add a guard:
+
+```ts
+const isValidJobId =
+  typeof jobId === "string" &&
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(jobId);
+```
+
+Only enable polling when the ID is valid.
+
+If the ID is absent or invalid:
+
+* do not call `/api/sarah/jobs/...`
+* stop the loading state
+* show a visible retryable error
+* log a safe structured error
+* never generate `[object Object]` in a URL
+
+## Polling behavior
+
+Confirm the poller:
+
+* requests `/api/sarah/jobs/:jobId`
+* stops on `completed`
+* stops on `failed`
+* stops on timeout
+* invalidates/refetches the active conversation messages after completion
+* displays the assistant reply automatically
+* does not duplicate the user message on retry
+
+## Types
+
+Correct the relevant TypeScript interfaces so the mutation response matches the backend contract exactly.
+
+Do not use `any` to hide the mismatch.
+
+The response should explicitly model the real returned shape, including the canonical `jobId`.
+
+## Regression tests
+
+Add tests covering:
+
+1. String `jobId` starts polling.
+2. Wrapped job object extracts `.id` only if that is the real supported response shape.
+3. An object passed as the job ID does not generate a request.
+4. Missing job ID stops loading and shows an error.
+5. Invalid UUID does not start polling.
+6. Completed job refetches conversation messages.
+7. Failed job stops polling and shows a retryable error.
+8. No request URL contains `[object Object]`.
+9. New conversation flow renders Sarah’s reply.
+10. Existing conversation flow renders Sarah’s reply.
+
+## Production acceptance test
+
+After the fix is deployed:
+
+1. Create a new conversation.
+2. Send a message.
+3. Confirm the browser requests `/api/sarah/jobs/<valid-uuid>`.
+4. Confirm no `[object Object]` request occurs.
+5. Confirm the job reaches `completed`.
+6. Confirm the assistant message appears automatically.
+7. Repeat in an existing conversation.
+8. Refresh and confirm the conversation persists.
+
+## Final verdict
+
+Use exactly one:
+
+```text
+FIXED — DEPLOYED AND BROWSER VERIFIED
+BLOCKED — RESPONSE CONTRACT UNKNOWN
+BLOCKED — FRONTEND POLLING FAILURE
+BLOCKED — DEPLOYMENT REQUIRED
+```
+
+Do not return `FIXED` until the deployed browser visibly renders Sarah’s response.

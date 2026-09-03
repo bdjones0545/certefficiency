@@ -1,0 +1,27 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "seed-course": "tsx src/seed-course-product.ts",
+    "seed-ai-course": "tsx src/seed-ai-agent-course.ts",
+    "upload-lesson1": "tsx src/upload-lesson1-video.ts",
+    "upload-lesson2": "tsx src/upload-lesson2-video.ts",
+    "update-lesson3": "tsx src/update-lesson3-r2-key.ts",
+    "seed-lesson11": "tsx src/seed-lesson11.ts",
+    "update-all-lessons": "tsx src/update-all-lessons-r2-keys.ts",
+    "verify-r2": "tsx src/verify-r2-objects.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.787.0",
+    "@google-cloud/storage": "^7.21.0",
+    "pg": "^8.13.3",
+    "stripe": "^22.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/pg": "^8.11.14",
+    "tsx": "catalog:"
+  }
+}

@@ -1,0 +1,145 @@
+# Upload AI Agent Course Lesson 1 — Introduction
+
+The AI Agent Course platform is already fully built and live at:
+
+`/course`
+
+Do not redesign or rebuild the course platform, database, navigation, Stripe checkout, paywall, enrollment system, webhook, success page, or progress tracking.
+
+This task is only to upload and connect the first completed course video.
+
+## Course
+
+**How to Build an AI Agent**
+
+## Lesson
+
+* Lesson number: 1
+* Title: **Introduction**
+* Access level: **Free Preview**
+* Course slug: `ai-agent-builder`
+
+## Video Upload
+
+I will upload the completed Lesson 1 video file directly to Replit.
+
+Use the uploaded file as the actual video source for Lesson 1.
+
+Do not require a HeyGen video ID for this lesson unless the existing architecture strictly requires it. Prefer secure hosted file storage and reliable streaming rather than storing a large video file directly in the application repository.
+
+The implementation must:
+
+* Upload the video to the platform’s configured object storage
+* Store the resulting secure video URL or storage key in the Lesson 1 database record
+* Connect the video to the existing Lesson 1 course player
+* Replace the current `AI_LESSON_1_VIDEO_ID` placeholder
+* Preserve the current lesson title, curriculum position, free-preview status, and access rules
+* Keep Lessons 2–10 locked
+* Make Lesson 1 watchable without purchasing the course
+
+## Database Update
+
+Update the existing Lesson 1 record in `platform_lessons`.
+
+Do not create a duplicate course or duplicate lesson.
+
+Store the appropriate video metadata, including:
+
+* Storage key or video URL
+* Original filename
+* MIME type
+* File size
+* Video duration
+* Upload status
+* Processing status
+* Updated timestamp
+
+The lesson should only become publicly playable after the upload and processing have completed successfully.
+
+## Video Player
+
+Use the existing course player.
+
+Confirm that Lesson 1 supports:
+
+* Play and pause
+* Scrubbing
+* Volume controls
+* Full-screen playback
+* Playback speed
+* Mobile playback
+* Resume watching
+* Progress persistence
+* Completion tracking
+
+Do not autoplay the video with sound when the page loads.
+
+Display a polished poster image before playback begins. Generate a thumbnail from the video if no custom thumbnail is uploaded.
+
+## Lesson Completion
+
+Use the existing lesson-progress system.
+
+Mark Lesson 1 complete once the authenticated user watches at least 90% of the video.
+
+For anonymous visitors, allow full playback of Lesson 1 without requiring account creation. Persist anonymous progress locally when possible, but do not weaken server-side course access controls.
+
+## End-of-Lesson Paywall
+
+When Lesson 1 reaches the end, display the existing premium course CTA.
+
+Copy:
+
+**You’ve completed the free introduction.**
+
+Continue through the full course to build a complete AI worker with identity, skills, tools, memory, persistent infrastructure, secure internet access, and a real-world interface.
+
+Display:
+
+**Unlock the Full Course — $497**
+
+The CTA must use the existing Stripe checkout flow for the `ai-agent-builder` course.
+
+Do not create a new Stripe product or price.
+
+## Security
+
+* Lesson 1 is intentionally public.
+* Lessons 2–10 must remain protected by server-side enrollment checks.
+* Do not return premium video URLs to users without a confirmed paid enrollment.
+* Do not expose storage credentials or private object-storage paths.
+* Validate uploaded file type and size.
+* Reject unsupported or potentially unsafe files.
+* Do not commit the uploaded video directly to Git unless there is no other available storage option.
+
+## Reliability
+
+Include clear states for:
+
+* Uploading
+* Processing
+* Ready
+* Upload failed
+* Processing failed
+
+Allow an administrator to retry or replace the Lesson 1 upload without creating duplicate lesson records.
+
+After implementation, verify:
+
+1. `/course` loads successfully.
+2. Lesson 1 plays for a logged-out visitor.
+3. Lesson 1 plays for a logged-in user without an enrollment.
+4. Lessons 2–10 remain locked.
+5. Progress saves for authenticated users.
+6. The completion state triggers at 90%.
+7. The $497 CTA opens the existing Stripe checkout.
+8. No existing CSCS video-course functionality is changed.
+9. No duplicate course, lesson, Stripe product, or Stripe price is created.
+
+Return a concise implementation summary that identifies:
+
+* Where the video file is stored
+* Which Lesson 1 record was updated
+* Whether the `AI_LESSON_1_VIDEO_ID` secret is still needed
+* The final playback URL or internal storage reference
+* The tests performed

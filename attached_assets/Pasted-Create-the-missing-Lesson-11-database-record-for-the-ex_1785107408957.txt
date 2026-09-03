@@ -1,0 +1,94 @@
+Create the missing Lesson 11 database record for the existing CertEfficiency AI Agent Course.
+
+## Current state
+
+* The AI Agent Course currently has exactly 10 database lesson records.
+* The corresponding Cloudflare R2 bucket contains 11 course videos.
+* The missing database lesson is Lesson 11.
+* The Lesson 11 R2 object already exists at:
+
+`courses/ai-agent-builder/lesson-11.mp4`
+
+Do not upload, copy, rename, or modify the R2 object.
+
+## Objective
+
+Create exactly one Lesson 11 record in the existing AI Agent Course and connect it to the existing R2 object.
+
+Do not create:
+
+* a duplicate course
+* duplicate Lessons 1–10
+* more than one Lesson 11 record
+* a permanent or public video URL
+
+## Implementation requirements
+
+1. Inspect the current lesson schema and existing Lessons 1–10.
+2. Follow the same field structure, course relationship, naming conventions, publishing state, and metadata conventions used by the existing lessons.
+3. Create Lesson 11 with:
+
+   * order: `11`
+   * video object key: `courses/ai-agent-builder/lesson-11.mp4`
+4. Use the correct existing AI Agent Course ID or slug.
+5. Preserve all existing lesson records and progress data.
+6. Make the seed or migration idempotent.
+7. Use an upsert or a guarded insert based on the existing course and lesson order.
+8. Do not overwrite unrelated lesson content.
+9. Do not expose the R2 object key as a public playback URL.
+10. Ensure the existing authenticated playback endpoint can resolve Lesson 11.
+
+Use the actual Lesson 11 title and description already established in the course curriculum if they are present elsewhere in the repository. If they are not present, use:
+
+Title:
+
+`Deploying and Operating Your Complete AI Worker`
+
+Description:
+
+`Connect the complete system, validate the worker’s identity, knowledge, skills, tools, memory, permissions, and persistent operation, and prepare it for secure real-world use.`
+
+## Update scripts
+
+Update the existing all-lessons R2 mapping script so it supports all 11 lessons rather than only 10.
+
+The expected mapping must include:
+
+`Lesson 11 → courses/ai-agent-builder/lesson-11.mp4`
+
+Running the script repeatedly must not create duplicates.
+
+## Verification
+
+After implementation:
+
+1. Run the database update or seed.
+2. Confirm the AI Agent Course contains exactly 11 lesson records.
+3. Confirm lesson orders are exactly 1 through 11 with no gaps or duplicates.
+4. Confirm all 11 records have the correct `video_object_key`.
+5. Confirm Lesson 1 remains the free preview.
+6. Confirm Lessons 2–11 remain protected by enrollment.
+7. Confirm Lesson 11 appears in the existing course navigation.
+8. Confirm an enrolled user can request a signed playback URL for Lesson 11.
+9. Confirm a non-enrolled user receives a controlled denial.
+10. Run the complete test suite and production build.
+
+Add regression tests proving:
+
+* the course contains exactly 11 lessons
+* Lesson 11 is not duplicated when the seed runs twice
+* Lesson 11 maps to the exact expected R2 object key
+* Lesson 11 belongs to the correct course
+* Lesson 11 playback requires enrollment
+* an enrolled user can receive a signed URL for Lesson 11
+
+Report:
+
+* the exact title and metadata used
+* files changed
+* database result
+* total lesson count
+* test results
+* build result
+* authenticated Lesson 11 playback result
+* unauthorized Lesson 11 denial result

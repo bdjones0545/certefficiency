@@ -1,0 +1,1 @@
+- [CertEfficiency Architecture](certefficiency-arch.md) — Video storage tiers (R2/GCS/HeyGen), R2 playback endpoint, DB schema, env vars, test patterns

@@ -1,0 +1,140 @@
+Debug and fix the CertEfficiency error:
+
+`Couldn't start a new conversation. Please try again.`
+
+Sarah’s public API and tunnel are live. The Replit application was recently redeployed after synchronizing the Sarah API key and signing secret.
+
+Trace the exact conversation-creation flow:
+
+```text
+frontend create conversation
+→ POST /api/conversations
+→ database insert
+→ Sarah POST /v1/conversations
+→ response normalization
+→ frontend state update
+```
+
+## Required diagnosis
+
+Capture and report:
+
+* Browser request URL
+* HTTP status from `POST /api/conversations`
+* Safe response body
+* Backend stack trace or structured error
+* Whether the local conversation row was created
+* Whether a Sarah job was created
+* Whether Sarah received `POST /v1/conversations`
+* Sarah’s HTTP status and response content type
+* Whether the failure occurred before or after database persistence
+
+Add structured logs:
+
+```text
+conversation_route_entered
+conversation_validated
+conversation_saved
+sarah_conversation_dispatch_started
+sarah_conversation_dispatch_completed
+sarah_conversation_dispatch_failed
+conversation_response_sent
+```
+
+Include safe IDs and correlation IDs. Do not log secrets.
+
+## Important behavior fix
+
+Creating a local CertEfficiency conversation must not fail solely because Sarah initialization fails.
+
+Use this flow:
+
+1. Validate the request.
+2. Create and persist the local conversation.
+3. Return the conversation to the frontend.
+4. Attempt Sarah initialization.
+5. If Sarah initialization fails:
+
+   * record the failure
+   * preserve the local conversation
+   * allow the user to type and send a first message
+   * retry Sarah initialization lazily on the first message
+   * show a non-blocking notice instead of preventing conversation creation
+
+Do not wrap the local database insert and remote Sarah call in one transaction.
+
+A temporary Sarah outage, `401`, timeout, schema mismatch, or invalid remote response must not prevent users from opening the chat.
+
+## Check the deployed environment
+
+Confirm the currently running backend process has:
+
+```env
+SARAH_PROVIDER=tunnel
+SARAH_TUNNEL_URL=https://certefficiency.certefficiency.com
+SARAH_API_KEY=<loaded>
+SARAH_SIGNING_SECRET=<loaded>
+```
+
+Do not print values. Log safe fingerprints or booleans only:
+
+```text
+provider=tunnel
+tunnelHost=certefficiency.certefficiency.com
+apiKeyLoaded=true
+signingSecretLoaded=true
+```
+
+Confirm the provider singleton was created after environment variables loaded and after the deployment restart.
+
+## Inspect Sarah conversation response
+
+Confirm Replit calls exactly:
+
+```text
+POST https://certefficiency.certefficiency.com/v1/conversations
+```
+
+Capture:
+
+* status
+* `Content-Type`
+* safe body
+* correlation ID
+
+If Sarah returns JSON `401`, inspect Sarah’s internal auth reason.
+
+If Sarah returns JSON `400`, compare the request schema with `workspace/sarah-api-contract.json`.
+
+If Sarah returns JSON `200` or `201`, compare the response envelope with Replit’s Zod schema.
+
+If the response is valid but Replit rejects it, fix the response normalization or schema mismatch.
+
+## Frontend handling
+
+The frontend should:
+
+* create the local conversation successfully
+* navigate into it
+* show Sarah’s opening message when available
+* otherwise show a safe temporary notice
+* allow the user to send the first message
+* display the actual server error during development instead of only the generic text
+
+Do not clear or discard a successfully created local conversation because remote initialization failed.
+
+## Completion criteria
+
+The task is complete when:
+
+1. Clicking New Conversation returns a local conversation.
+2. The UI opens that conversation.
+3. Sarah initialization succeeds or fails non-blockingly.
+4. The composer remains enabled.
+5. Sending the first message calls `/api/conversations/:id/messages`.
+6. Replit calls Sarah `/v1/messages`.
+7. The Sarah job reaches `completed`.
+8. Sarah’s response appears in the chat.
+9. Tests cover Sarah initialization failure without blocking local conversation creation.
+
+Report the root cause, files changed, endpoint status, Sarah response, and final end-to-end result.

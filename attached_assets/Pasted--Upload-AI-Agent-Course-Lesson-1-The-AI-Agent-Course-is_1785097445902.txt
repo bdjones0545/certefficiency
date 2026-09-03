@@ -1,0 +1,70 @@
+# Upload AI Agent Course Lesson 1
+
+The AI Agent Course is already built and live at `/course`.
+
+I am now uploading the completed video for **Lesson 1**.
+
+Do not rebuild or redesign the course platform. Do not create a new course, lesson, Stripe product, or price.
+
+## Lesson Details
+
+* Course: **How to Build an AI Agent**
+* Course slug: `ai-agent-builder`
+* Lesson number: **1**
+* Lesson title: **Introduction**
+* Access: **Free Preview**
+
+## Task
+
+Take the attached video file and connect it to the existing Lesson 1 record in `platform_lessons`.
+
+Replace the current Lesson 1 placeholder with the uploaded video.
+
+Use the platform’s existing file-storage or object-storage system. Do not commit the video file directly into the repository unless no secure storage option exists.
+
+## Required Behavior
+
+* Lesson 1 must remain publicly viewable without purchase.
+* Lessons 2–10 must remain locked.
+* Use the existing course video player.
+* Preserve the existing lesson-progress tracking.
+* Mark the lesson complete after 90% watched.
+* Show the existing $497 course paywall and Stripe checkout CTA after completion.
+* Do not alter the existing Stripe integration.
+* Do not change the legacy CSCS video course.
+
+## Video Metadata
+
+Update the existing Lesson 1 database record with:
+
+* Video storage key or secure URL
+* Original filename
+* MIME type
+* File size
+* Duration
+* Thumbnail or poster image
+* Processing status
+* Updated timestamp
+
+Generate a thumbnail from the uploaded video if one is not provided.
+
+## Verification
+
+After connecting the video, verify:
+
+1. `/course` loads correctly.
+2. Lesson 1 plays for logged-out visitors.
+3. Lesson 1 plays for logged-in users without a purchase.
+4. Lessons 2–10 remain locked.
+5. Video progress saves correctly.
+6. Completion triggers at 90%.
+7. The existing **Unlock Full Course — $497** button opens the correct Stripe checkout.
+8. No duplicate lesson or course record was created.
+9. The uploaded file is not exposed through an insecure public repository path.
+
+Return a concise summary confirming:
+
+* Where the video is stored
+* Which existing lesson record was updated
+* Whether `AI_LESSON_1_VIDEO_ID` is still required
+* Whether playback and progress tracking passed verification

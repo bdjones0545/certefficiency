@@ -1,0 +1,378 @@
+CertEfficiency is still unusable: I cannot create a new conversation and I cannot talk to Sarah.
+
+Stop all unrelated work. Do not optimize performance, implement image uploads, or work on Stan. Repair the deployed end-to-end Sarah chat flow first.
+
+## Required outcome
+
+From the actual deployed CertEfficiency browser:
+
+1. Click **New Chat**.
+2. A local conversation is created and opens immediately.
+3. The composer is enabled.
+4. Type and send a message.
+5. The user message appears immediately.
+6. Sarah receives the request.
+7. Sarah’s reply is persisted.
+8. Sarah’s reply appears in the browser.
+
+Do not declare success based on direct API tests alone.
+
+## Reproduce and capture the actual errors
+
+Perform one New Chat attempt and one Send attempt.
+
+For each, report:
+
+* browser request URL
+* HTTP method
+* HTTP status
+* response content type
+* safe response body
+* frontend console error
+* backend route entered
+* backend exception or stack trace
+* database records created
+* Sarah request URL
+* Sarah HTTP status
+* Sarah safe response body
+* final job status
+
+Use a single correlation ID across frontend, API server, database job, Sarah dispatch, and Sarah API logs.
+
+## New Chat must be local-first
+
+Inspect:
+
+```text
+POST /api/conversations
+```
+
+This route must:
+
+1. Authenticate.
+2. Validate the local request.
+3. Generate and persist the canonical local `conversationId`.
+4. Commit the database insert.
+5. Return `201` immediately.
+6. Initialize Sarah asynchronously afterward.
+
+Canonical response:
+
+```json
+{
+  "conversation": {
+    "id": "local-conversation-id",
+    "title": "New conversation",
+    "status": "active",
+    "createdAt": "ISO timestamp"
+  }
+}
+```
+
+Sarah failure must never make this route fail after the local insert succeeds.
+
+If Sarah returns `400`, `401`, `500`, times out, or returns invalid JSON:
+
+* retain the local conversation
+* open it in the UI
+* keep the composer enabled
+* record initialization as failed
+* retry initialization on the first user message
+
+## Verify the deployed frontend contract
+
+Normalize the create response:
+
+```ts
+const result = await createConv.mutateAsync();
+const conversation = result.conversation ?? result;
+
+if (!conversation?.id) {
+  throw new Error("Conversation response missing id");
+}
+```
+
+Then:
+
+```ts
+setActiveJobId(null);
+setSendError(null);
+setNewChatError(null);
+setActiveConversationId(conversation.id);
+
+queryClient.invalidateQueries({
+  queryKey: ["conversations"],
+});
+```
+
+Verify that the frontend is not still accessing only:
+
+```ts
+newConv.id
+```
+
+Verify that a refetch does not restore the previous conversation and overwrite the newly selected one.
+
+## Fix Send Message independently
+
+Inspect:
+
+```text
+POST /api/conversations/:conversationId/messages
+```
+
+Required order:
+
+1. Verify conversation ownership.
+2. Validate the message.
+3. Persist the user message locally.
+4. Create the Sarah job as `queued`.
+5. Return success to the frontend.
+6. Dispatch asynchronously to Sarah.
+7. Set job to `processing`.
+8. Normalize Sarah’s response.
+9. Persist Sarah’s message.
+10. Set job to `completed`.
+11. Invalidate the active conversation’s message query.
+
+The user message must remain visible even when Sarah fails.
+
+Do not clear composer text before the local HTTP request succeeds.
+
+Correct flow:
+
+```text
+capture text
+→ send local request
+→ request succeeds
+→ clear input
+```
+
+On failure:
+
+* keep the text
+* display the actual error
+* re-enable Send
+* allow retry
+
+## Verify Sarah request bodies
+
+For conversation initialization, send:
+
+```json
+{
+  "requestId": "unique-request-id",
+  "conversationId": "local-conversation-id"
+}
+```
+
+For message dispatch, inspect Sarah’s live request schema and send every required field exactly.
+
+Do not rely on an outdated TypeScript interface.
+
+Log the safe outgoing body keys:
+
+```text
+requestKeys=[requestId, conversationId, ...]
+```
+
+Do not log private content or secrets.
+
+## Verify the live Sarah responses
+
+Sarah conversation response:
+
+```json
+{
+  "conversationId": "...",
+  "message": {
+    "type": "text",
+    "content": "..."
+  },
+  "actions": [],
+  "metadata": {}
+}
+```
+
+Sarah message response:
+
+```json
+{
+  "message": {
+    "type": "text",
+    "content": "..."
+  },
+  "actions": [],
+  "progress": {},
+  "metadata": {}
+}
+```
+
+Normalize both at the Sarah adapter boundary into:
+
+```ts
+type CanonicalSarahResult = {
+  responseMessages: Array<{
+    messageType: string;
+    content: string;
+    metadata?: Record<string, unknown>;
+  }>;
+  actions: Array<Record<string, unknown>>;
+  progress?: Record<string, unknown> | null;
+  jobCompleted: boolean;
+};
+```
+
+No frontend, route, or database code should depend directly on Sarah’s native envelope.
+
+## Verify credentials in the actual running processes
+
+Do not rely on the Replit Secrets screen.
+
+Log only:
+
+```text
+apiKeyLoaded=true
+signingSecretLoaded=true
+apiKeyFingerprint=<first 12 SHA-256 characters>
+signingSecretFingerprint=<first 12 SHA-256 characters>
+```
+
+Do this in:
+
+* the running Replit API process
+* Sarah’s running server process
+
+Confirm both fingerprints match.
+
+Also log Sarah’s internal auth checks:
+
+```text
+bearer_valid=true|false
+timestamp_valid=true|false
+signature_valid=true|false
+request_id_valid=true|false
+```
+
+Keep the public response generic.
+
+## Verify timeout and deployment
+
+Confirm the deployed Sarah adapter timeout is 120 seconds.
+
+Verify the actual running process was rebuilt and restarted after these changes.
+
+Report:
+
+* deployed commit or build identifier
+* API process start time
+* timeout value loaded at startup
+* Sarah tunnel URL loaded at startup
+
+## Verify job-state cleanup
+
+On both `completed` and `failed`:
+
+```ts
+setActiveJobId(null);
+
+queryClient.invalidateQueries({
+  queryKey: ["messages", conversationId],
+});
+```
+
+The active-job state must be scoped by conversation.
+
+A failed job in one conversation must not disable:
+
+* New Chat
+* another conversation
+* the composer permanently
+
+## Required stage logs
+
+New Chat:
+
+```text
+new_chat_clicked
+create_request_started
+conversation_route_entered
+conversation_validated
+conversation_saved
+conversation_response_sent
+frontend_conversation_received
+active_conversation_updated
+sarah_initialization_started
+sarah_initialization_completed
+sarah_initialization_failed
+```
+
+Send Message:
+
+```text
+send_clicked
+message_request_started
+message_route_entered
+message_validated
+message_saved
+sarah_job_created
+sarah_dispatch_started
+sarah_http_response_received
+sarah_response_normalized
+assistant_message_saved
+job_completed
+messages_invalidated
+assistant_message_rendered
+```
+
+## Database verification
+
+After the live test, report:
+
+### New Chat
+
+* conversation row created: yes/no
+* conversation ID
+* HTTP status returned
+* Sarah initialization status
+* initialization error
+
+### Send Message
+
+* user message row created: yes/no
+* Sarah job created: yes/no
+* status sequence
+* assistant message created: yes/no
+* visible error message created: yes/no
+
+## Completion gate
+
+Do not declare completion because:
+
+* curl to Sarah works
+* unit tests pass
+* a local database row exists
+* the code compiles
+* Sarah responds outside the browser
+
+Completion requires this exact deployed browser flow:
+
+```text
+New Chat works
+→ conversation opens
+→ Send works
+→ Sarah replies
+→ reply appears onscreen
+```
+
+Return:
+
+* exact New Chat root cause
+* exact Send root cause
+* browser statuses before and after
+* Sarah statuses before and after
+* database record results
+* files changed
+* tests added
+* deployed browser verification
+* final visible result

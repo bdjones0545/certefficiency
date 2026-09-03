@@ -1,0 +1,307 @@
+# CertEfficiency Premium Video Course Implementation
+
+## Objective
+
+Create a premium video course section inside CertEfficiency that allows users to watch the free introduction video before requiring payment to unlock the remaining lessons.
+
+The purchase should be powered by our existing Stripe account under **Efficiency Strength Training**.
+
+---
+
+# User Experience
+
+## Landing Page
+
+Create a new navigation item:
+
+**🎥 Video Course**
+
+The page should look modern, minimal, and Apple-inspired.
+
+Layout:
+
+* Large hero section
+* Course title
+* Short description
+* Progress indicator
+* Course curriculum
+* Preview video
+* Student testimonials placeholder
+* Purchase CTA
+
+---
+
+## Hero Section
+
+Title:
+
+**NSCA CSCS Practical & Applied Masterclass**
+
+Subtitle:
+
+Master the Practical & Applied portion of the CSCS exam through concise lessons designed to help you think like a strength coach—not memorize like a student.
+
+Primary CTA:
+
+Watch Free Preview
+
+Secondary CTA:
+
+Unlock Full Course
+
+---
+
+# Free Content
+
+Only Lesson 1 is available without purchasing.
+
+Lesson 1 should autoplay from the embedded HeyGen video.
+
+Under the video display:
+
+Lesson 1 • Welcome to the Course
+
+Estimated Length
+
+Description
+
+---
+
+After Lesson 1 ends...
+
+Fade in a premium overlay.
+
+Large lock icon.
+
+Headline:
+
+Ready for the rest?
+
+Text:
+
+Unlock the remaining lessons and complete the entire Practical & Applied course.
+
+Show the remaining lessons blurred in the background.
+
+Example:
+
+✓ Lesson 2
+
+✓ Lesson 3
+
+✓ Lesson 4
+
+...
+
+✓ Lesson 10
+
+All locked.
+
+---
+
+# Pricing Card
+
+Display:
+
+Lifetime Access
+
+10 HD Lessons
+
+Future Updates Included
+
+Access on Desktop and Mobile
+
+Certificate Ready Study System
+
+Price:
+
+$497
+
+Large Purchase Button
+
+Unlock the Course
+
+---
+
+# Stripe Integration
+
+Clicking Unlock Course should:
+
+Create a Stripe Checkout Session
+
+Redirect to Stripe Checkout
+
+Payment amount:
+
+$497
+
+Business:
+
+Efficiency Strength Training
+
+After successful payment:
+
+Return to:
+
+/course/success
+
+After cancellation:
+
+Return to:
+
+/video-course
+
+---
+
+# Access Control
+
+Users who have not purchased:
+
+Can only watch Lesson 1.
+
+Lessons 2–10 remain locked.
+
+Purchased users:
+
+Immediate access to all lessons.
+
+Remember purchase permanently.
+
+Store:
+
+user_id
+
+stripe_customer_id
+
+payment_status
+
+purchase_date
+
+course_access=true
+
+---
+
+# Course Curriculum
+
+Lesson 1
+Introduction
+
+Lesson 2
+Movement Assessment
+
+Lesson 3
+Exercise Technique
+
+Lesson 4
+Program Design
+
+Lesson 5
+Speed & Agility
+
+Lesson 6
+Olympic Lifting
+
+Lesson 7
+Testing & Evaluation
+
+Lesson 8
+Special Populations
+
+Lesson 9
+Case Studies
+
+Lesson 10
+Final Review
+
+Each lesson card should display:
+
+Thumbnail
+
+Duration
+
+Completion status
+
+Watch button
+
+Progress bar
+
+---
+
+# Course Progress
+
+Track:
+
+Lessons completed
+
+Overall percentage
+
+Last watched lesson
+
+Resume where left off
+
+Automatically mark lessons complete after 90% watched.
+
+---
+
+# Dashboard
+
+Once purchased, create a dashboard showing:
+
+Overall Progress
+
+Current Lesson
+
+Continue Watching
+
+Completed Lessons
+
+Remaining Lessons
+
+Estimated Time Remaining
+
+---
+
+# Mobile
+
+Fully responsive.
+
+Large touch targets.
+
+Video-first design.
+
+Fast loading.
+
+Support portrait viewing.
+
+---
+
+# Design Language
+
+Use Apple's Human Interface Guidelines.
+
+Lots of whitespace.
+
+Rounded cards.
+
+Soft shadows.
+
+Minimal typography.
+
+Smooth animations.
+
+Professional premium appearance.
+
+This should feel like purchasing a $2,000 executive education course rather than simply watching embedded videos.
+
+---
+
+# Technical Requirements
+
+* Embed HeyGen-hosted videos securely.
+* Do not expose premium lesson URLs before purchase.
+* Verify access server-side before returning premium video metadata.
+* Use Stripe webhooks to grant course access after successful payment rather than relying on client-side redirects.
+* Persist progress so users can resume across devices.
+* Prepare the architecture so additional courses can be added later without redesigning the system.
+
+The implementation should be production-ready, secure, scalable, and polished enough to serve as the foundation for all future CertEfficiency premium courses.
