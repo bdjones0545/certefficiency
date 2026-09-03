@@ -11,7 +11,7 @@ import rateLimit from "express-rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
 import {
-  StripeWebhookVerificationError,
+  classifyStripeWebhookError,
   WebhookHandlers,
 } from "./lib/webhookHandlers";
 
@@ -248,15 +248,8 @@ app.post(
       res.status(200).json({ received: true });
     } catch (err: unknown) {
       logger.error({ err }, "stripe_webhook_error");
-      if (err instanceof StripeWebhookVerificationError) {
-        res.status(400).json({ error: "Invalid webhook signature" });
-        return;
-      }
-
-      // Return 5xx for credential, Stripe sync, and application persistence
-      // failures. Stripe retries webhook deliveries only when we do not
-      // acknowledge them as successfully processed.
-      res.status(500).json({ error: "Webhook processing failed" });
+      const failure = classifyStripeWebhookError(err);
+      res.status(failure.statusCode).json({ error: failure.message });
     }
   },
 );

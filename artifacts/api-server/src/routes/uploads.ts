@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { db, uploadsTable } from "@workspace/db";
+import { db, conversationsTable, uploadsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { DeleteUploadParams } from "@workspace/api-zod";
@@ -194,6 +194,25 @@ router.post("/uploads", requireAuth, (req, res, next) => {
     const file = req.file;
 
     try {
+      if (conversationId) {
+        const [conversation] = await db
+          .select({ id: conversationsTable.id })
+          .from(conversationsTable)
+          .where(
+            and(
+              eq(conversationsTable.id, conversationId),
+              eq(conversationsTable.userId, req.userId!),
+            ),
+          )
+          .limit(1);
+
+        if (!conversation) {
+          fs.unlink(file.path, () => {});
+          res.status(404).json({ error: "Conversation not found" });
+          return;
+        }
+      }
+
       const [record] = await db.insert(uploadsTable).values({
         userId: req.userId!,
         conversationId: conversationId || null,

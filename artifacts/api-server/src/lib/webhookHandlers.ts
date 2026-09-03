@@ -15,6 +15,15 @@ export class StripeWebhookVerificationError extends Error {
   }
 }
 
+export function classifyStripeWebhookError(error: unknown): {
+  statusCode: 400 | 500;
+  message: string;
+} {
+  return error instanceof StripeWebhookVerificationError
+    ? { statusCode: 400, message: "Invalid webhook signature" }
+    : { statusCode: 500, message: "Webhook processing failed" };
+}
+
 export class WebhookHandlers {
   static async processWebhook(
     payload: Buffer,

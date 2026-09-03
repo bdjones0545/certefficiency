@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   processSyncWebhook: vi.fn(),
   getStripeCredentials: vi.fn(),
   update: vi.fn(),
+  loggerInfo: vi.fn(),
 }));
 
 vi.mock("stripe", () => ({
@@ -41,7 +42,7 @@ vi.mock("@workspace/db", () => ({
 }));
 
 vi.mock("../lib/logger.js", () => ({
-  logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
+  logger: { info: mocks.loggerInfo, error: vi.fn(), warn: vi.fn() },
 }));
 
 function completedEvent(): Stripe.Event {
@@ -95,6 +96,20 @@ describe("Stripe webhook processing", () => {
     expect(mocks.update).not.toHaveBeenCalled();
   });
 
+  it("classifies only signature failures as 400 and retryable failures as 500", async () => {
+    const { classifyStripeWebhookError, StripeWebhookVerificationError } =
+      await import("../lib/webhookHandlers.js");
+
+    expect(
+      classifyStripeWebhookError(
+        new StripeWebhookVerificationError(new Error("bad signature")),
+      ),
+    ).toEqual({ statusCode: 400, message: "Invalid webhook signature" });
+    expect(classifyStripeWebhookError(new Error("database unavailable"))).toEqual(
+      { statusCode: 500, message: "Webhook processing failed" },
+    );
+  });
+
   it("propagates application database failures so Stripe can retry", async () => {
     const databaseError = new Error("database unavailable");
     const chain = updateChain();
@@ -107,6 +122,18 @@ describe("Stripe webhook processing", () => {
       WebhookHandlers.processWebhook(Buffer.from("{}"), "valid"),
     ).rejects.toBe(databaseError);
     expect(mocks.processSyncWebhook).toHaveBeenCalledOnce();
+  });
+
+  it("propagates Stripe sync failures without applying application updates", async () => {
+    const syncError = new Error("Stripe sync unavailable");
+    mocks.processSyncWebhook.mockRejectedValue(syncError);
+
+    const { WebhookHandlers } = await import("../lib/webhookHandlers.js");
+
+    await expect(
+      WebhookHandlers.processWebhook(Buffer.from("{}"), "valid"),
+    ).rejects.toBe(syncError);
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 
   it("makes completion updates conditional on session identity and prior status", async () => {
@@ -139,5 +166,19 @@ describe("Stripe webhook processing", () => {
         },
       ],
     });
+  });
+
+  it("does not report access granted when a duplicate event updates no rows", async () => {
+    const chain = updateChain([]);
+    mocks.update.mockReturnValue(chain);
+
+    const { WebhookHandlers } = await import("../lib/webhookHandlers.js");
+    await WebhookHandlers.handleApplicationEvent(completedEvent());
+
+    expect(chain.returning).toHaveBeenCalledOnce();
+    expect(mocks.loggerInfo).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "platform_course_access_granted",
+    );
   });
 });
