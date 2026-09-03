@@ -23,6 +23,7 @@ import {
   isValidSarahJobId,
   extractSarahJobId,
   buildSarahJobUrl,
+  isAwaitingSarahReply,
 } from "../lib/sarah-job.js";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -168,5 +169,24 @@ describe("Sarah job polling — 10 regression tests", () => {
     // Both produce valid polling URLs
     expect(buildSarahJobUrl(jobId1)).toBe(`/api/sarah/jobs/${VALID_UUID}`);
     expect(buildSarahJobUrl(jobId2)).toBe(`/api/sarah/jobs/${VALID_UUID2}`);
+  });
+
+  it("POLL-11: recent trailing user message restores pending state after refresh", () => {
+    const now = Date.parse("2026-09-03T12:00:00Z");
+    expect(isAwaitingSarahReply([
+      { role: "assistant", createdAt: "2026-09-03T11:59:00Z" },
+      { role: "user", createdAt: "2026-09-03T11:59:30Z" },
+    ], now)).toBe(true);
+  });
+
+  it("POLL-12: assistant/error response and stale requests are not pending", () => {
+    const now = Date.parse("2026-09-03T12:00:00Z");
+    expect(isAwaitingSarahReply([
+      { role: "user", createdAt: "2026-09-03T11:59:00Z" },
+      { role: "assistant", createdAt: "2026-09-03T11:59:30Z" },
+    ], now)).toBe(false);
+    expect(isAwaitingSarahReply([
+      { role: "user", createdAt: "2026-09-03T11:40:00Z" },
+    ], now)).toBe(false);
   });
 });

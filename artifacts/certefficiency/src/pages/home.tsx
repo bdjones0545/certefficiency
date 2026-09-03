@@ -13,7 +13,7 @@ import {
   getGetConversationQueryKey,
   getGetSarahJobQueryKey,
 } from "@workspace/api-client-react";
-import { isValidSarahJobId, extractSarahJobId } from "@/lib/sarah-job";
+import { isValidSarahJobId, extractSarahJobId, isAwaitingSarahReply } from "@/lib/sarah-job";
 import { useLocation, useSearch } from "wouter";
 import ReactMarkdown from "react-markdown";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -125,12 +125,13 @@ const ChatBubble = ({ message }: { message: MessageWithAttachments }) => {
 // Typing indicator
 // ---------------------------------------------------------------------------
 const TypingIndicator = () => (
-  <div className="flex justify-start my-6">
+  <div className="flex justify-start my-6" role="status" aria-live="polite" aria-label="Sarah is preparing a response">
     <div className="flex gap-4">
       <Avatar className="w-8 h-8 shrink-0 ring-1 ring-border/50">
         <AvatarFallback className="bg-primary text-white text-xs">S</AvatarFallback>
       </Avatar>
       <div className="px-5 py-4 bg-card border border-border shadow-sm card-squircle rounded-tl-[4px] flex items-center gap-1.5">
+        <span className="sr-only">Sarah is preparing a response.</span>
         <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" />
         <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" style={{ animationDelay: "150ms" }} />
         <span className="w-2 h-2 rounded-full bg-primary/40 animate-pulse" style={{ animationDelay: "300ms" }} />
@@ -163,8 +164,8 @@ export default function Home() {
     }
   }, [conversationId, conversationNotFound, setLocation]);
 
-  // Poll messages every 3 s when the list is empty — catches Sarah's opening
-  // message arriving asynchronously after conversation creation.
+  // Poll while an opening or assistant response is outstanding. Deriving this
+  // from message history makes the pending state survive refresh/navigation.
   const { data: messages } = useListMessages(
     conversationId || "",
     {
@@ -175,14 +176,15 @@ export default function Home() {
         queryKey: ["messages", conversationId ?? "disabled"],
         refetchInterval: (query) => {
           const msgs = query.state.data;
-          // Keep polling until Sarah's opening message arrives, then stop
-          // (further updates come via job invalidation).
           if (!msgs || msgs.length === 0) return 3000;
+          if (isAwaitingSarahReply(msgs)) return 2000;
           return false;
         },
       },
     }
   );
+
+  const awaitingSarahReply = isAwaitingSarahReply(messages);
 
   const createConv = useCreateConversation();
   const sendMsg = useSendMessage();
@@ -256,6 +258,9 @@ export default function Home() {
         conversation_id: conversationId,
       });
       setActiveJobId(null);
+      if (status === "failed") {
+        setSendError("Sarah couldn't complete that response. Your message is safe—please try again.");
+      }
       if (conversationId) {
         queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
         devLog("messages_invalidated", { conversation_id: conversationId });
@@ -434,7 +439,7 @@ export default function Home() {
   };
 
   // §11 — composer is disabled only while a job for THIS conversation is active
-  const composerDisabled = !!activeJobId || sendMsg.isPending;
+  const composerDisabled = !!activeJobId || awaitingSarahReply || sendMsg.isPending;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -483,11 +488,11 @@ export default function Home() {
               })
             )}
 
-            {activeJobId && <TypingIndicator />}
+            {(activeJobId || awaitingSarahReply) && <TypingIndicator />}
 
             {sendError && (
               <div className="flex justify-center my-4">
-                <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 px-4 py-2 rounded-full">
+                <div role="alert" className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 px-4 py-2 rounded-full">
                   <AlertCircle className="w-3.5 h-3.5" />
                   {sendError}
                 </div>

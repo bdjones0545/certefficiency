@@ -44,3 +44,20 @@ export function buildSarahJobUrl(jobId: unknown): string | null {
   if (!isValidSarahJobId(jobId)) return null;
   return `/api/sarah/jobs/${jobId}`;
 }
+
+/**
+ * Recover the "Sarah is replying" state after a refresh. The job ID itself is
+ * intentionally not persisted in the browser, but a recent user message with
+ * no following assistant/error message means a response is still outstanding.
+ */
+export function isAwaitingSarahReply(
+  messages: Array<{ role: string; createdAt: string }> | null | undefined,
+  nowMs = Date.now(),
+  maxAgeMs = 8 * 60 * 1000,
+): boolean {
+  if (!messages?.length) return false;
+  const last = messages[messages.length - 1];
+  if (last.role !== "user") return false;
+  const createdAtMs = Date.parse(last.createdAt);
+  return Number.isFinite(createdAtMs) && nowMs - createdAtMs <= maxAgeMs;
+}
