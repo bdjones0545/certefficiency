@@ -159,7 +159,7 @@ export default function Home() {
   // or never owned), clear it so the user sees a clean empty state.
   useEffect(() => {
     if (conversationId && conversationNotFound) {
-      setLocation("/");
+      setLocation("/app");
     }
   }, [conversationId, conversationNotFound, setLocation]);
 
@@ -365,7 +365,7 @@ export default function Home() {
         devLog("frontend_conversation_received", { corrId, conversation_id: targetConvId });
         devLog("active_conversation_updated",    { corrId, conversation_id: targetConvId });
 
-        setLocation(`/?c=${targetConvId}`);
+        setLocation(`/app?c=${targetConvId}`);
 
         // Keep sidebar in sync — sidebar uses the ["conversations"] override key
         queryClient.invalidateQueries({ queryKey: ["conversations"] });

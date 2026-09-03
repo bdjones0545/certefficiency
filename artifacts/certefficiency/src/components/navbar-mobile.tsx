@@ -60,7 +60,7 @@ export const NavbarMobile = () => {
   };
 
   const handleSelectConv = (id: string) => {
-    setLocation(`/?c=${id}`);
+    setLocation(`/app?c=${id}`);
     setOpen(false);
   };
 
@@ -75,7 +75,7 @@ export const NavbarMobile = () => {
         if (existing.some((c) => c.id === conv.id)) return existing;
         return [conv, ...existing];
       });
-      setLocation(`/?c=${conv.id}`);
+      setLocation(`/app?c=${conv.id}`);
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
       setOpen(false);
     } catch (err) {
@@ -95,7 +95,7 @@ export const NavbarMobile = () => {
         existing ? existing.filter((c) => c.id !== idToDelete) : existing
       );
       if (activeConvId === idToDelete) {
-        setLocation("/");
+        setLocation("/app");
       }
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
     } catch (err) {

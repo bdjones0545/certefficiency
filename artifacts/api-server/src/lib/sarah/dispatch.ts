@@ -17,6 +17,7 @@ import {
   isBillingError,
   isProviderError,
 } from "./inferenceStatus";
+import { buildSarahRecentMessages } from "./contextGuidance";
 
 // ---------------------------------------------------------------------------
 // Bounded job timeout
@@ -168,7 +169,7 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
       mode: input.mode,
       message: { id: input.messageId, content: input.content },
       context: {
-        recentMessages: input.recentMessages,
+        recentMessages: buildSarahRecentMessages(input.recentMessages),
         topicMastery: [],
         recentAnswers: [],
         studyPlan: null,

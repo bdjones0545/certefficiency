@@ -16,7 +16,7 @@ function extractConvIdFromSearch(search: string): string | null {
   return new URLSearchParams(search).get("c");
 }
 
-/** Simulates setLocation(`/?c=${conv.id}`) then reading it back */
+/** Simulates setLocation(`/app?c=${conv.id}`) then reading it back */
 function buildSearchParam(id: string): string {
   return `c=${id}`;
 }
@@ -48,10 +48,10 @@ describe("CONV-1 — conversationId extraction from useSearch", () => {
 describe("CONV-2 — URL never contains [object Object]", () => {
   it("setLocation template literal with a UUID string produces a clean URL", () => {
     const convId = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-    const url = `/?c=${convId}`;
+    const url = `/app?c=${convId}`;
     expect(url).not.toContain("[object");
     expect(url).not.toContain("Object]");
-    expect(url).toBe(`/?c=${convId}`);
+    expect(url).toBe(`/app?c=${convId}`);
   });
 
   it("an accidental object coercion would produce [object Object]", () => {

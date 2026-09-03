@@ -63,7 +63,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
 
       devLog("active_conversation_updated", { conversation_id: conv.id });
 
-      setLocation(`/?c=${conv.id}`);
+      setLocation(`/app?c=${conv.id}`);
 
       // Invalidate to sync server state (conversations list + the new conv)
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
@@ -91,7 +91,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
 
       // Navigate away if the deleted conv was active
       if (activeId === idToDelete) {
-        setLocation("/");
+        setLocation("/app");
       }
 
       queryClient.invalidateQueries({ queryKey: ["conversations"] });
@@ -161,7 +161,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
           >
             <button
               type="button"
-              onClick={() => setLocation(`/?c=${conv.id}`)}
+              onClick={() => setLocation(`/app?c=${conv.id}`)}
               aria-current={activeId === conv.id ? "page" : undefined}
               className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left"
             >
