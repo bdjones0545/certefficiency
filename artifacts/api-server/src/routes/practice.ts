@@ -1,12 +1,24 @@
 import { Router } from "express";
 import { db, practiceQuestionsTable, practiceAttemptsTable, studySessionsTable, topicMasteryTable, progressEventsTable } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { sarah } from "../lib/sarah";
 import { StartStudyModeBody, SubmitAnswerBody, SubmitAnswerParams } from "@workspace/api-zod";
 import { messagesTable, conversationsTable } from "@workspace/db";
 
 const router = Router();
+
+async function findOwnedConversation(conversationId: string, userId: string) {
+  const [conversation] = await db.select({ id: conversationsTable.id })
+    .from(conversationsTable)
+    .where(and(
+      eq(conversationsTable.id, conversationId),
+      eq(conversationsTable.userId, userId),
+    ))
+    .limit(1);
+
+  return conversation;
+}
 
 // POST /study-modes/start
 router.post("/study-modes/start", requireAuth, async (req, res): Promise<void> => {
@@ -17,6 +29,12 @@ router.post("/study-modes/start", requireAuth, async (req, res): Promise<void> =
   }
 
   const { conversationId, mode, certificationId } = parsed.data;
+
+  const conversation = await findOwnedConversation(conversationId, req.userId!);
+  if (!conversation) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
 
   const [session] = await db.insert(studySessionsTable).values({
     userId: req.userId!,
@@ -69,6 +87,12 @@ router.post("/practice/:questionId/answer", requireAuth, async (req, res): Promi
   }
 
   const { selectedOptionId, confidenceLevel, conversationId, flagged } = parsed.data;
+
+  const conversation = await findOwnedConversation(conversationId, req.userId!);
+  if (!conversation) {
+    res.status(404).json({ error: "Conversation not found" });
+    return;
+  }
 
   // Find the question
   const [question] = await db.select()
