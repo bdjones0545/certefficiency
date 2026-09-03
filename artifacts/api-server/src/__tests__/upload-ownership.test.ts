@@ -51,6 +51,10 @@ vi.mock("fs", () => ({
     mkdirSync: vi.fn(),
     unlink: mocks.unlink,
     createReadStream: vi.fn(),
+    promises: {
+      readFile: vi.fn(async () => Buffer.from("notes")),
+      chmod: vi.fn(async () => undefined),
+    },
   },
 }));
 
@@ -88,6 +92,11 @@ vi.mock("../lib/auth.js", () => ({
 
 vi.mock("../lib/logger.js", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
+}));
+
+vi.mock("../lib/uploadInspection.js", () => ({
+  inspectUploadedFile: vi.fn(async () => undefined),
+  UploadInspectionError: class UploadInspectionError extends Error {},
 }));
 
 async function buildApp(): Promise<Express> {

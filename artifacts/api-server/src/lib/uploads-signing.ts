@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { getPublicBaseUrl } from "./publicUrl";
 
 const EXPIRY_SECONDS = 15 * 60; // 15 minutes
 
@@ -18,6 +19,9 @@ export function generateSignedUploadUrl(
 }
 
 export function signToken(uploadId: string, expires: number, secret: string): string {
+  if (Buffer.byteLength(secret, "utf8") < 32) {
+    throw new Error("A signing secret of at least 32 bytes is required");
+  }
   return crypto
     .createHmac("sha256", secret)
     .update(`${uploadId}:${expires}`)
@@ -30,7 +34,8 @@ export function verifySignedToken(
   expires: number,
   secret: string,
 ): boolean {
-  if (Math.floor(Date.now() / 1000) > expires) return false; // expired
+  if (Buffer.byteLength(secret, "utf8") < 32) return false;
+  if (!Number.isSafeInteger(expires) || Math.floor(Date.now() / 1000) > expires) return false; // expired
   const expected = signToken(uploadId, expires, secret);
   // Constant-time comparison to prevent timing attacks
   try {
@@ -41,15 +46,6 @@ export function verifySignedToken(
 }
 
 /**
- * Resolve the public base URL of this API server.
- * Tries CERTEFFICIENCY_PUBLIC_URL, then REPLIT_DEV_DOMAIN, else localhost.
+ * Resolve and validate the configured public base URL of this API server.
  */
-export function getPublicBaseUrl(): string {
-  if (process.env.CERTEFFICIENCY_PUBLIC_URL) {
-    return process.env.CERTEFFICIENCY_PUBLIC_URL.replace(/\/$/, "");
-  }
-  if (process.env.REPLIT_DEV_DOMAIN) {
-    return `https://${process.env.REPLIT_DEV_DOMAIN}`;
-  }
-  return "http://localhost:8080";
-}
+export { getPublicBaseUrl };

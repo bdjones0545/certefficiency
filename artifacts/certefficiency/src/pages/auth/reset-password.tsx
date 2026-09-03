@@ -11,7 +11,14 @@ import { Loader2 } from "lucide-react";
 
 export default function ResetPassword() {
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState(() => new URLSearchParams(window.location.search).get("token") || "");
+  const [token, setToken] = useState(() => {
+    const resetToken = new URLSearchParams(window.location.search).get("token") || "";
+    if (resetToken) {
+      // Keep this credential out of browser history and referrer headers after capture.
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    return resetToken;
+  });
   const mutation = useResetPassword();
   const [, setLocation] = useLocation();
   const { toast } = useToast();

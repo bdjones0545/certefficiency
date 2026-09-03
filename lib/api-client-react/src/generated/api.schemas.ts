@@ -17,6 +17,7 @@ export interface SuccessResponse {
 
 export interface ErrorResponse {
   error: string;
+  requestId?: string;
 }
 
 export interface RegisterInput {
@@ -37,6 +38,11 @@ export interface ForgotPasswordInput {
 }
 
 export interface ResetPasswordInput {
+  /**
+     * @minLength 43
+     * @maxLength 43
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
   token: string;
   /** @minLength 8 */
   password: string;
@@ -368,8 +374,16 @@ export interface AnswerResult {
 
 export interface MockExamInput {
   certificationId: string;
+  /**
+     * @minimum 10
+     * @maximum 100
+     */
   questionCount?: number;
-  /** @nullable */
+  /**
+     * @minimum 5
+     * @maximum 480
+     * @nullable
+     */
   timeLimitMinutes?: number | null;
 }
 

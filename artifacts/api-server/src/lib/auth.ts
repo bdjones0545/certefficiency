@@ -9,7 +9,12 @@ import { logger } from "./logger";
 const _rawSecret = process.env.SESSION_SECRET;
 const _isProduction = process.env.NODE_ENV === "production";
 
-if (_isProduction && (!_rawSecret || _rawSecret === "dev-secret-change-in-production")) {
+if (
+  _isProduction &&
+  (!_rawSecret ||
+    _rawSecret === "dev-secret-change-in-production" ||
+    Buffer.byteLength(_rawSecret, "utf8") < 32)
+) {
   throw new Error(
     "FATAL: SESSION_SECRET is missing or insecure in production. " +
     "Set a strong random value in Replit Secrets before deploying.",

@@ -153,7 +153,12 @@ app.use(
 
 // Auth-specific rate limit (stricter)
 app.use(
-  ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password"],
+  [
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/forgot-password",
+    "/api/auth/reset-password",
+  ],
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 20,
@@ -268,16 +273,39 @@ app.use((_req: Request, res: Response) => {
 });
 
 // Global error handler
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const message =
-    err instanceof Error ? err.message : "An unexpected error occurred";
-  const status = (err as { status?: number }).status ?? 500;
-
-  if (status >= 500) {
-    logger.error({ err }, "Unhandled server error");
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
   }
 
-  res.status(status).json({ error: message });
+  const candidateStatus = (err as { status?: unknown }).status;
+  const status =
+    typeof candidateStatus === "number" &&
+    Number.isInteger(candidateStatus) &&
+    candidateStatus >= 400 &&
+    candidateStatus <= 599
+      ? candidateStatus
+      : 500;
+  const requestId = String(req.id ?? "unknown");
+
+  if (status >= 500) {
+    logger.error({ err, requestId }, "Unhandled server error");
+  }
+
+  const publicMessages: Record<number, string> = {
+    400: "Invalid request",
+    401: "Unauthorized",
+    403: "Forbidden",
+    404: "Not found",
+    413: "Request body too large",
+    415: "Unsupported media type",
+    429: "Too many requests",
+  };
+  res.status(status).json({
+    error: status >= 500 ? "Internal server error" : (publicMessages[status] ?? "Request failed"),
+    requestId,
+  });
 });
 
 export default app;

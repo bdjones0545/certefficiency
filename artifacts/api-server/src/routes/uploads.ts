@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from "uuid";
 import { logger } from "../lib/logger";
 import { generateSignedUploadUrl, getPublicBaseUrl, verifySignedToken } from "../lib/uploads-signing";
 import jwt from "jsonwebtoken";
+import { inspectUploadedFile, UploadInspectionError } from "../lib/uploadInspection";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -31,6 +32,13 @@ const ALL_ALLOWED_MIME_TYPES = [
 ];
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+function encodeContentDispositionFilename(filename: string): string {
+  return encodeURIComponent(filename).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Storage
@@ -120,19 +128,12 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
       "image_upload_route_entered",
     );
 
-    // Double-check MIME (multer filter is the primary gate, this is belt-and-suspenders)
-    if (!IMAGE_MIME_TYPES.includes(file.mimetype)) {
-      fs.unlink(file.path, () => {});
-      res.status(400).json({ error: "Unsupported image format." });
-      return;
-    }
-
-    reqLog.info(
-      { userId: req.userId, mimeType: file.mimetype, sizeBytes: file.size },
-      "image_upload_validated",
-    );
-
     try {
+      await inspectUploadedFile(file);
+      reqLog.info(
+        { userId: req.userId, mimeType: file.mimetype, sizeBytes: file.size },
+        "image_upload_validated",
+      );
       reqLog.info({ userId: req.userId }, "image_storage_started");
 
       const [record] = await db.insert(uploadsTable).values({
@@ -167,6 +168,10 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
       });
     } catch (e) {
       fs.unlink(file.path, () => {});
+      if (e instanceof UploadInspectionError) {
+        res.status(400).json({ error: e.message });
+        return;
+      }
       next(e);
     }
   });
@@ -194,6 +199,8 @@ router.post("/uploads", requireAuth, (req, res, next) => {
     const file = req.file;
 
     try {
+      await inspectUploadedFile(file);
+
       if (conversationId) {
         const [conversation] = await db
           .select({ id: conversationsTable.id })
@@ -227,6 +234,10 @@ router.post("/uploads", requireAuth, (req, res, next) => {
       res.status(201).json(record);
     } catch (e) {
       fs.unlink(file.path, () => {});
+      if (e instanceof UploadInspectionError) {
+        res.status(400).json({ error: e.message });
+        return;
+      }
       next(e);
     }
   });
@@ -299,7 +310,14 @@ router.get("/uploads/:id/file", async (req, res): Promise<void> => {
   }
 
   res.setHeader("Content-Type", record.mimeType);
-  res.setHeader("Content-Disposition", `inline; filename="${record.originalFilename}"`);
+  const asciiFilename = path.basename(record.originalFilename)
+    .replace(/[^\x20-\x7e]/g, "_")
+    .replace(/["\\]/g, "_");
+  const encodedFilename = encodeContentDispositionFilename(path.basename(record.originalFilename));
+  res.setHeader(
+    "Content-Disposition",
+    `inline; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`,
+  );
   res.setHeader("Cache-Control", "private, max-age=3600");
 
   fs.createReadStream(record.storagePath).pipe(res);

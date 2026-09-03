@@ -25,6 +25,14 @@ export const HealthCheckDatabaseResponse = zod.object({
 
 
 /**
+ * @summary Dependency-aware readiness check
+ */
+export const ReadinessCheckResponse = zod.object({
+  "status": zod.string()
+})
+
+
+/**
  * @summary Register a new user
  */
 
@@ -34,7 +42,7 @@ export const registerBodyPasswordMin = 8;
 
 export const RegisterBody = zod.object({
   "name": zod.string().min(1),
-  "email": zod.string(),
+  "email": zod.string().email(),
   "password": zod.string().min(registerBodyPasswordMin)
 })
 
@@ -95,7 +103,7 @@ export const GetMeResponse = zod.object({
  * @summary Request password reset
  */
 export const ForgotPasswordBody = zod.object({
-  "email": zod.string()
+  "email": zod.string().email()
 })
 
 export const ForgotPasswordResponse = zod.object({
@@ -107,12 +115,17 @@ export const ForgotPasswordResponse = zod.object({
 /**
  * @summary Reset password using token
  */
+export const resetPasswordBodyTokenMin = 43;
+export const resetPasswordBodyTokenMax = 43;
+
+
+export const resetPasswordBodyTokenRegExp = new RegExp('^[A-Za-z0-9_-]+$');
 export const resetPasswordBodyPasswordMin = 8;
 
 
 
 export const ResetPasswordBody = zod.object({
-  "token": zod.string(),
+  "token": zod.string().min(resetPasswordBodyTokenMin).max(resetPasswordBodyTokenMax).regex(resetPasswordBodyTokenRegExp),
   "password": zod.string().min(resetPasswordBodyPasswordMin)
 })
 
@@ -380,7 +393,7 @@ export const SendMessageParams = zod.object({
 })
 
 export const SendMessageBody = zod.object({
-  "content": zod.string().min(1, "Message content cannot be empty"),
+  "content": zod.string(),
   "uploadIds": zod.array(zod.string()).optional()
 })
 
@@ -496,13 +509,16 @@ export const SubmitAnswerResponse = zod.object({
 export const createMockExamBodyQuestionCountDefault = 50;
 export const createMockExamBodyQuestionCountMin = 10;
 export const createMockExamBodyQuestionCountMax = 100;
+
 export const createMockExamBodyTimeLimitMinutesMin = 5;
 export const createMockExamBodyTimeLimitMinutesMax = 480;
 
+
+
 export const CreateMockExamBody = zod.object({
   "certificationId": zod.string(),
-  "questionCount": zod.number().int().min(createMockExamBodyQuestionCountMin).max(createMockExamBodyQuestionCountMax).default(createMockExamBodyQuestionCountDefault),
-  "timeLimitMinutes": zod.number().int().min(createMockExamBodyTimeLimitMinutesMin).max(createMockExamBodyTimeLimitMinutesMax).nullish()
+  "questionCount": zod.number().min(createMockExamBodyQuestionCountMin).max(createMockExamBodyQuestionCountMax).default(createMockExamBodyQuestionCountDefault),
+  "timeLimitMinutes": zod.number().min(createMockExamBodyTimeLimitMinutesMin).max(createMockExamBodyTimeLimitMinutesMax).nullish()
 })
 
 export const CreateMockExamResponse = zod.object({
@@ -947,4 +963,3 @@ export const RetrySarahJobResponse = zod.object({
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
-

@@ -12,23 +12,12 @@ import { getUncachableStripeClient } from "../lib/stripeClient";
 import { objectStorageClient } from "../lib/objectStorage";
 import { r2Storage, getR2Config } from "../lib/r2Storage";
 import { logger } from "../lib/logger";
-import type { Request } from "express";
+import { getPublicBaseUrl } from "../lib/publicUrl";
 
 const router = Router();
 
 function routeParam(value: string | string[]): string {
   return Array.isArray(value) ? value[0] : value;
-}
-
-function getBaseUrl(req: Request): string {
-  const origin = req.headers.origin as string | undefined;
-  if (origin) return origin;
-  const domains = process.env.REPLIT_DOMAINS || "";
-  const first = domains.split(",")[0];
-  return (
-    process.env.CERTEFFICIENCY_PUBLIC_URL ||
-    (first ? `https://${first}` : "http://localhost:3000")
-  );
 }
 
 function buildHeygenUrl(videoId: string | undefined): string | null {
@@ -273,7 +262,7 @@ router.post(
       })
       .returning();
 
-    const baseUrl = getBaseUrl(req);
+    const baseUrl = getPublicBaseUrl();
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       payment_method_types: ["card"],

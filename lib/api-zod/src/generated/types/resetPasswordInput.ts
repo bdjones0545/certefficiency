@@ -7,6 +7,11 @@
  */
 
 export interface ResetPasswordInput {
+  /**
+     * @minLength 43
+     * @maxLength 43
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
   token: string;
   /** @minLength 8 */
   password: string;

@@ -1,10 +1,13 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
-import { v4 as uuidv4 } from "uuid";
 import { db, usersTable, passwordResetTokensTable } from "@workspace/db";
 import { eq, and, gt, isNull } from "drizzle-orm";
 import { signToken, requireAuth } from "../lib/auth";
-import { logger } from "../lib/logger";
+import {
+  createPasswordResetToken,
+  hashPasswordResetToken,
+  sendPasswordResetEmail,
+} from "../lib/passwordReset";
 import {
   RegisterBody, LoginBody, ForgotPasswordBody, ResetPasswordBody,
   ChangePasswordBody,
@@ -118,24 +121,43 @@ router.post("/auth/forgot-password", async (req, res): Promise<void> => {
   }
 
   const normalizedEmail = parsed.data.email.toLowerCase().trim();
-  const [user] = await db.select({ id: usersTable.id })
+  const [user] = await db.select({ id: usersTable.id, email: usersTable.email })
     .from(usersTable)
-    .where(eq(usersTable.email, normalizedEmail))
+    .where(and(eq(usersTable.email, normalizedEmail), isNull(usersTable.deletedAt)))
     .limit(1);
 
   // Always return success to prevent email enumeration
   if (user) {
-    const token = uuidv4();
+    const { rawToken, tokenHash } = createPasswordResetToken();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    await db.insert(passwordResetTokensTable).values({
-      userId: user.id,
-      token,
-      expiresAt,
+    const resetToken = await db.transaction(async (tx) => {
+      // A newly issued token invalidates every older, unused token.
+      await tx.update(passwordResetTokensTable)
+        .set({ usedAt: new Date() })
+        .where(and(
+          eq(passwordResetTokensTable.userId, user.id),
+          isNull(passwordResetTokensTable.usedAt),
+        ));
+
+      const [created] = await tx.insert(passwordResetTokensTable).values({
+        userId: user.id,
+        token: tokenHash,
+        expiresAt,
+      }).returning({ id: passwordResetTokensTable.id });
+      return created;
     });
 
-    req.log.info({ userId: user.id }, "Password reset token created");
-    // In production, send email here
+    try {
+      await sendPasswordResetEmail(user.email, rawToken);
+      req.log.info({ userId: user.id }, "Password reset email sent");
+    } catch (error) {
+      // Preserve the enumeration-safe response, but make the undelivered token unusable.
+      await db.update(passwordResetTokensTable)
+        .set({ usedAt: new Date() })
+        .where(eq(passwordResetTokensTable.id, resetToken.id));
+      req.log.error({ err: error, userId: user.id }, "password_reset_email_failed");
+    }
   }
 
   res.json({ success: true, message: "If an account exists with that email, a reset link has been sent." });
@@ -149,33 +171,47 @@ router.post("/auth/reset-password", async (req, res): Promise<void> => {
     return;
   }
 
-  const { token, password } = parsed.data;
-
-  const [resetToken] = await db.select()
-    .from(passwordResetTokensTable)
-    .where(and(
-      eq(passwordResetTokensTable.token, token),
-      isNull(passwordResetTokensTable.usedAt),
-      gt(passwordResetTokensTable.expiresAt, new Date()),
-    ))
-    .limit(1);
-
-  if (!resetToken) {
+  const { token: rawToken, password } = parsed.data;
+  if (!/^[A-Za-z0-9_-]{43}$/.test(rawToken)) {
     res.status(400).json({ error: "Invalid or expired reset token" });
     return;
   }
+  const tokenHash = hashPasswordResetToken(rawToken);
 
   const passwordHash = await bcrypt.hash(password, 12);
+  const usedAt = new Date();
 
-  await db.transaction(async (tx) => {
-    await tx.update(usersTable)
-      .set({ passwordHash, updatedAt: new Date() })
-      .where(eq(usersTable.id, resetToken.userId));
+  const changed = await db.transaction(async (tx) => {
+    // Claim the token atomically. Only one concurrent request can receive a row.
+    const [claimed] = await tx.update(passwordResetTokensTable)
+      .set({ usedAt })
+      .where(and(
+        eq(passwordResetTokensTable.token, tokenHash),
+        isNull(passwordResetTokensTable.usedAt),
+        gt(passwordResetTokensTable.expiresAt, usedAt),
+      ))
+      .returning({ userId: passwordResetTokensTable.userId });
+    if (!claimed) return false;
+
+    const updatedUsers = await tx.update(usersTable)
+      .set({ passwordHash, updatedAt: usedAt })
+      .where(and(eq(usersTable.id, claimed.userId), isNull(usersTable.deletedAt)))
+      .returning({ id: usersTable.id });
+    if (updatedUsers.length === 0) return false;
 
     await tx.update(passwordResetTokensTable)
-      .set({ usedAt: new Date() })
-      .where(eq(passwordResetTokensTable.id, resetToken.id));
+      .set({ usedAt })
+      .where(and(
+        eq(passwordResetTokensTable.userId, claimed.userId),
+        isNull(passwordResetTokensTable.usedAt),
+      ));
+    return true;
   });
+
+  if (!changed) {
+    res.status(400).json({ error: "Invalid or expired reset token" });
+    return;
+  }
 
   res.json({ success: true, message: "Password reset successfully" });
 });
@@ -207,7 +243,15 @@ router.post("/auth/change-password", requireAuth, async (req, res): Promise<void
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 12);
-  await db.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, user.id));
+  await db.transaction(async (tx) => {
+    await tx.update(usersTable).set({ passwordHash, updatedAt: new Date() }).where(eq(usersTable.id, user.id));
+    await tx.update(passwordResetTokensTable)
+      .set({ usedAt: new Date() })
+      .where(and(
+        eq(passwordResetTokensTable.userId, user.id),
+        isNull(passwordResetTokensTable.usedAt),
+      ));
+  });
 
   res.json({ success: true, message: "Password changed successfully" });
 });

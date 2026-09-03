@@ -8,7 +8,15 @@
 
 export interface MockExamInput {
   certificationId: string;
+  /**
+     * @minimum 10
+     * @maximum 100
+     */
   questionCount?: number;
-  /** @nullable */
+  /**
+     * @minimum 5
+     * @maximum 480
+     * @nullable
+     */
   timeLimitMinutes?: number | null;
 }
