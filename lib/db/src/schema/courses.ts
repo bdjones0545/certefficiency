@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, boolean, integer, real, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, uuid, timestamp, boolean, integer, real, pgEnum, check, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -17,7 +18,10 @@ export const coursePurchasesTable = pgTable("course_purchases", {
   purchaseDate: timestamp("purchase_date", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("course_purchases_user_course_idx").on(table.userId, table.courseId),
+  uniqueIndex("course_purchases_stripe_session_uidx").on(table.stripeSessionId),
+]);
 
 export const courseProgressTable = pgTable("course_progress", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -29,7 +33,11 @@ export const courseProgressTable = pgTable("course_progress", {
   lastWatchedAt: timestamp("last_watched_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  uniqueIndex("course_progress_user_course_lesson_uidx").on(table.userId, table.courseId, table.lessonNumber),
+  check("course_progress_lesson_number_check", sql`${table.lessonNumber} > 0`),
+  check("course_progress_percentage_check", sql`${table.watchPercentage} >= 0 and ${table.watchPercentage} <= 100`),
+]);
 
 export const insertCoursePurchaseSchema = createInsertSchema(coursePurchasesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertCourseProgressSchema = createInsertSchema(courseProgressTable).omit({ id: true, createdAt: true, updatedAt: true });

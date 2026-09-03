@@ -56,6 +56,19 @@ router.post("/user-certifications", requireAuth, async (req, res): Promise<void>
     return;
   }
 
+  const [existing] = await db
+    .select({ id: userCertificationsTable.id })
+    .from(userCertificationsTable)
+    .where(and(
+      eq(userCertificationsTable.userId, req.userId!),
+      eq(userCertificationsTable.certificationId, certificationId),
+    ))
+    .limit(1);
+  if (existing) {
+    res.status(409).json({ error: "Certification is already linked to this account" });
+    return;
+  }
+
   if (isPrimary) {
     await db.update(userCertificationsTable)
       .set({ isPrimary: false })

@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -9,7 +9,10 @@ export const sessionsTable = pgTable("sessions", {
   token: text("token").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("sessions_user_idx").on(table.userId),
+  index("sessions_expires_at_idx").on(table.expiresAt),
+]);
 
 export const insertSessionSchema = createInsertSchema(sessionsTable).omit({
   id: true, createdAt: true,
@@ -24,7 +27,10 @@ export const passwordResetTokensTable = pgTable("password_reset_tokens", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usedAt: timestamp("used_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("password_reset_tokens_user_idx").on(table.userId),
+  index("password_reset_tokens_expires_at_idx").on(table.expiresAt),
+]);
 
 export const guestSessionsTable = pgTable("guest_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),

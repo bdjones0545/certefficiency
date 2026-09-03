@@ -8,7 +8,11 @@ import {
   real,
   bigint,
   pgEnum,
+  check,
+  index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { usersTable } from "./users";
 
 // Separate enum so it doesn't conflict with purchase_status on course_purchases
@@ -39,7 +43,9 @@ export const platformCoursesTable = pgTable("platform_courses", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (table) => [
+  check("platform_courses_price_usd_check", sql`${table.priceUsd} >= 0`),
+]);
 
 // ---------------------------------------------------------------------------
 // platform_lessons — ordered lesson catalog for each course
@@ -75,7 +81,12 @@ export const platformLessonsTable = pgTable("platform_lessons", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (table) => [
+  uniqueIndex("platform_lessons_course_order_uidx").on(table.courseId, table.order),
+  check("platform_lessons_order_check", sql`${table.order} > 0`),
+  check("platform_lessons_file_size_check", sql`${table.videoFileSizeBytes} is null or ${table.videoFileSizeBytes} >= 0`),
+  check("platform_lessons_duration_check", sql`${table.videoDurationSecs} is null or ${table.videoDurationSecs} >= 0`),
+]);
 
 // ---------------------------------------------------------------------------
 // platform_enrollments — one row per user per course purchase
@@ -99,7 +110,10 @@ export const platformEnrollmentsTable = pgTable("platform_enrollments", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("platform_enrollments_user_course_idx").on(table.userId, table.courseId),
+  uniqueIndex("platform_enrollments_stripe_session_uidx").on(table.stripeSessionId),
+]);
 
 // ---------------------------------------------------------------------------
 // platform_lesson_progress — per-user per-lesson watch state
@@ -123,7 +137,11 @@ export const platformLessonProgressTable = pgTable("platform_lesson_progress", {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
-});
+}, (table) => [
+  uniqueIndex("platform_lesson_progress_user_lesson_uidx").on(table.userId, table.lessonId),
+  index("platform_lesson_progress_user_course_idx").on(table.userId, table.courseId),
+  check("platform_lesson_progress_percentage_check", sql`${table.watchPercentage} >= 0 and ${table.watchPercentage} <= 100`),
+]);
 
 export type PlatformCourse = typeof platformCoursesTable.$inferSelect;
 export type PlatformLesson = typeof platformLessonsTable.$inferSelect;

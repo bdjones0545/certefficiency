@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, integer, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, uuid, timestamp, integer, boolean, pgEnum, check, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -17,7 +18,11 @@ export const conversationsTable = pgTable("conversations", {
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  index("conversations_user_updated_idx").on(table.userId, table.updatedAt),
+  index("conversations_certification_idx").on(table.certificationId),
+  check("conversations_message_count_check", sql`${table.messageCount} >= 0`),
+]);
 
 export const insertConversationSchema = createInsertSchema(conversationsTable).omit({
   id: true, createdAt: true, updatedAt: true,

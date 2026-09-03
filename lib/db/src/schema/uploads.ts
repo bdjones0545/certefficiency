@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, uuid, timestamp, integer, pgEnum, check, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -18,7 +19,12 @@ export const uploadsTable = pgTable("uploads", {
   status: uploadStatusEnum("status").notNull().default("processing"),
   sarahJobId: uuid("sarah_job_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("uploads_user_created_idx").on(table.userId, table.createdAt),
+  index("uploads_conversation_idx").on(table.conversationId),
+  index("uploads_sarah_job_idx").on(table.sarahJobId),
+  check("uploads_size_bytes_check", sql`${table.sizeBytes} >= 0`),
+]);
 
 export const insertUploadSchema = createInsertSchema(uploadsTable).omit({ id: true, createdAt: true });
 export type InsertUpload = z.infer<typeof insertUploadSchema>;

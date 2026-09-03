@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, boolean, integer, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, uuid, timestamp, boolean, integer, pgEnum, check, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -26,7 +27,14 @@ export const userCertificationsTable = pgTable("user_certifications", {
   isPrimary: boolean("is_primary").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (table) => [
+  uniqueIndex("user_certifications_user_certification_uidx").on(table.userId, table.certificationId),
+  uniqueIndex("user_certifications_one_primary_per_user_uidx")
+    .on(table.userId)
+    .where(sql`${table.isPrimary} = true`),
+  index("user_certifications_certification_idx").on(table.certificationId),
+  check("user_certifications_weekly_hours_check", sql`${table.weeklyHours} is null or (${table.weeklyHours} >= 0 and ${table.weeklyHours} <= 168)`),
+]);
 
 export const insertCertificationSchema = createInsertSchema(certificationsTable).omit({
   id: true, createdAt: true,

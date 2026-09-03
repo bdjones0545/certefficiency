@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, jsonb, pgEnum, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { conversationsTable } from "./conversations";
@@ -22,7 +22,10 @@ export const messagesTable = pgTable("messages", {
   sarahJobId: uuid("sarah_job_id"),
   attachmentIds: jsonb("attachment_ids").$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("messages_conversation_created_idx").on(table.conversationId, table.createdAt),
+  index("messages_sarah_job_idx").on(table.sarahJobId),
+]);
 
 export const messageVersionsTable = pgTable("message_versions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -31,7 +34,9 @@ export const messageVersionsTable = pgTable("message_versions", {
   content: text("content").notNull(),
   structuredData: jsonb("structured_data"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("message_versions_message_version_uidx").on(table.messageId, table.version),
+]);
 
 export const insertMessageSchema = createInsertSchema(messagesTable).omit({
   id: true, createdAt: true,

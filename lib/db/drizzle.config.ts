@@ -7,7 +7,7 @@ if (!process.env.DATABASE_URL) {
 
 export default defineConfig({
   schema: path.join(__dirname, "./src/schema/index.ts"),
-  out: process.env.DRIZZLE_OUT ?? path.join(__dirname, "./drizzle"),
+  out: process.env.DRIZZLE_OUT ?? "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.DATABASE_URL,

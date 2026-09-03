@@ -202,10 +202,22 @@ router.post("/courses/:courseId/progress", requireAuth, async (req, res): Promis
 
   if (
     typeof lessonNumber !== "number" ||
+    !Number.isInteger(lessonNumber) ||
     lessonNumber < 1 ||
     lessonNumber > course.lessons.length
   ) {
     res.status(400).json({ error: "Invalid lesson number" });
+    return;
+  }
+
+  if (
+    watchPercentage !== undefined &&
+    (typeof watchPercentage !== "number" ||
+      !Number.isFinite(watchPercentage) ||
+      watchPercentage < 0 ||
+      watchPercentage > 100)
+  ) {
+    res.status(400).json({ error: "Watch percentage must be between 0 and 100" });
     return;
   }
 

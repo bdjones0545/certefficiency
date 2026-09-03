@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, integer, boolean, jsonb, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, uuid, timestamp, integer, boolean, jsonb, pgEnum, check, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -21,7 +22,9 @@ export const practiceQuestionsTable = pgTable("practice_questions", {
   optionExplanations: jsonb("option_explanations"),
   strategyNote: text("strategy_note"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("practice_questions_certification_difficulty_idx").on(table.certificationId, table.difficulty),
+]);
 
 export const practiceAttemptsTable = pgTable("practice_attempts", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -34,7 +37,11 @@ export const practiceAttemptsTable = pgTable("practice_attempts", {
   flagged: boolean("flagged").notNull().default(false),
   feedback: jsonb("feedback"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("practice_attempts_user_created_idx").on(table.userId, table.createdAt),
+  index("practice_attempts_question_idx").on(table.questionId),
+  check("practice_attempts_confidence_check", sql`${table.confidenceLevel} is null or (${table.confidenceLevel} >= 1 and ${table.confidenceLevel} <= 5)`),
+]);
 
 export const studySessionsTable = pgTable("study_sessions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -46,7 +53,9 @@ export const studySessionsTable = pgTable("study_sessions", {
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   endedAt: timestamp("ended_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("study_sessions_user_started_idx").on(table.userId, table.startedAt),
+]);
 
 export const topicMasteryTable = pgTable("topic_mastery", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -58,7 +67,11 @@ export const topicMasteryTable = pgTable("topic_mastery", {
   questionsAnswered: integer("questions_answered").notNull().default(0),
   correctAnswers: integer("correct_answers").notNull().default(0),
   lastUpdatedAt: timestamp("last_updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  uniqueIndex("topic_mastery_user_certification_domain_uidx").on(table.userId, table.certificationId, table.domain),
+  check("topic_mastery_score_check", sql`${table.masteryScore} >= 0 and ${table.masteryScore} <= 100`),
+  check("topic_mastery_question_counts_check", sql`${table.questionsAnswered} >= 0 and ${table.correctAnswers} >= 0 and ${table.correctAnswers} <= ${table.questionsAnswered}`),
+]);
 
 export const insertPracticeQuestionSchema = createInsertSchema(practiceQuestionsTable).omit({ id: true, createdAt: true });
 export const insertPracticeAttemptSchema = createInsertSchema(practiceAttemptsTable).omit({ id: true, createdAt: true });

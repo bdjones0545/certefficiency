@@ -1,4 +1,5 @@
-import { pgTable, text, uuid, timestamp, integer, boolean, jsonb, real, pgEnum } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { pgTable, text, uuid, timestamp, integer, boolean, jsonb, real, pgEnum, check, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
@@ -18,7 +19,13 @@ export const mockExamsTable = pgTable("mock_exams", {
   score: real("score"),
   domainBreakdown: jsonb("domain_breakdown"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index("mock_exams_user_created_idx").on(table.userId, table.createdAt),
+  index("mock_exams_certification_idx").on(table.certificationId),
+  check("mock_exams_question_count_check", sql`${table.questionCount} > 0`),
+  check("mock_exams_time_limit_check", sql`${table.timeLimitMinutes} is null or ${table.timeLimitMinutes} > 0`),
+  check("mock_exams_score_check", sql`${table.score} is null or (${table.score} >= 0 and ${table.score} <= 100)`),
+]);
 
 export const mockExamQuestionsTable = pgTable("mock_exam_questions", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -32,7 +39,10 @@ export const mockExamQuestionsTable = pgTable("mock_exam_questions", {
   flagged: boolean("flagged").notNull().default(false),
   correctOptionId: text("correct_option_id"),
   explanation: text("explanation"),
-});
+}, (table) => [
+  uniqueIndex("mock_exam_questions_exam_number_uidx").on(table.examId, table.questionNumber),
+  check("mock_exam_questions_number_check", sql`${table.questionNumber} > 0`),
+]);
 
 export const insertMockExamSchema = createInsertSchema(mockExamsTable).omit({ id: true, createdAt: true });
 export const insertMockExamQuestionSchema = createInsertSchema(mockExamQuestionsTable).omit({ id: true });

@@ -348,6 +348,17 @@ router.post(
     }
 
     const { watchPercentage, completed } = req.body;
+    if (
+      watchPercentage !== undefined &&
+      (typeof watchPercentage !== "number" ||
+        !Number.isFinite(watchPercentage) ||
+        watchPercentage < 0 ||
+        watchPercentage > 100)
+    ) {
+      res.status(400).json({ error: "Watch percentage must be between 0 and 100" });
+      return;
+    }
+
     const isCompleted =
       completed === true ||
       (typeof watchPercentage === "number" && watchPercentage >= 90);
