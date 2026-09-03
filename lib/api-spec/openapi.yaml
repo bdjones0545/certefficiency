@@ -1246,8 +1246,12 @@ components:
         questionCount:
           type: integer
           default: 50
+          minimum: 10
+          maximum: 100
         timeLimitMinutes:
           type: ["integer", "null"]
+          minimum: 5
+          maximum: 480
 
     MockExam:
       type: object

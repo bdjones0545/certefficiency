@@ -494,11 +494,15 @@ export const SubmitAnswerResponse = zod.object({
  * @summary Start a new mock exam
  */
 export const createMockExamBodyQuestionCountDefault = 50;
+export const createMockExamBodyQuestionCountMin = 10;
+export const createMockExamBodyQuestionCountMax = 100;
+export const createMockExamBodyTimeLimitMinutesMin = 5;
+export const createMockExamBodyTimeLimitMinutesMax = 480;
 
 export const CreateMockExamBody = zod.object({
   "certificationId": zod.string(),
-  "questionCount": zod.number().default(createMockExamBodyQuestionCountDefault),
-  "timeLimitMinutes": zod.number().nullish()
+  "questionCount": zod.number().int().min(createMockExamBodyQuestionCountMin).max(createMockExamBodyQuestionCountMax).default(createMockExamBodyQuestionCountDefault),
+  "timeLimitMinutes": zod.number().int().min(createMockExamBodyTimeLimitMinutesMin).max(createMockExamBodyTimeLimitMinutesMax).nullish()
 })
 
 export const CreateMockExamResponse = zod.object({
@@ -943,5 +947,4 @@ export const RetrySarahJobResponse = zod.object({
   "completedAt": zod.coerce.date().nullish(),
   "createdAt": zod.coerce.date()
 })
-
 

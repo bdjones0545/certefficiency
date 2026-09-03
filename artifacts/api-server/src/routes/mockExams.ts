@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { db, mockExamsTable, mockExamQuestionsTable, certificationsTable, progressEventsTable } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -11,8 +12,25 @@ import {
 
 const router = Router();
 
+const MOCK_EXAM_GENERATION_WINDOW_MS = 60 * 60 * 1000;
+const MOCK_EXAM_GENERATION_LIMIT = 3;
+
+// Generation is one of the most expensive AI operations in the application.
+// Apply this after authentication so the budget follows the account rather
+// than a shared proxy IP.
+const mockExamGenerationLimiter = rateLimit({
+  windowMs: MOCK_EXAM_GENERATION_WINDOW_MS,
+  limit: MOCK_EXAM_GENERATION_LIMIT,
+  keyGenerator: (req) => req.userId!,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Mock exam generation limit reached. Please try again later.",
+  },
+});
+
 // POST /mock-exams
-router.post("/mock-exams", requireAuth, async (req, res): Promise<void> => {
+router.post("/mock-exams", requireAuth, mockExamGenerationLimiter, async (req, res): Promise<void> => {
   const parsed = CreateMockExamBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -47,7 +65,16 @@ router.post("/mock-exams", requireAuth, async (req, res): Promise<void> => {
       timeLimitMinutes: timeLimitMinutes ?? null,
     });
 
-    for (const q of result.questions) {
+    // Never persist more questions than the validated request permits, even if
+    // an upstream provider returns an unexpectedly large response.
+    const generatedQuestions = result.questions.slice(0, questionCount);
+    if (generatedQuestions.length !== questionCount) {
+      throw new Error(
+        `Sarah returned ${generatedQuestions.length} of ${questionCount} requested questions`,
+      );
+    }
+
+    for (const q of generatedQuestions) {
       questions.push({
         examId: exam.id,
         questionNumber: q.questionNumber,
@@ -65,6 +92,16 @@ router.post("/mock-exams", requireAuth, async (req, res): Promise<void> => {
     }
   } catch (err) {
     req.log.error({ err }, "Failed to generate mock exam questions");
+    await db.delete(mockExamsTable).where(
+      and(
+        eq(mockExamsTable.id, exam.id),
+        eq(mockExamsTable.userId, req.userId!),
+      ),
+    );
+    res.status(502).json({
+      error: "Mock exam generation failed. Please try again.",
+    });
+    return;
   }
 
   const examQuestions = await db.select().from(mockExamQuestionsTable).where(eq(mockExamQuestionsTable.examId, exam.id));
