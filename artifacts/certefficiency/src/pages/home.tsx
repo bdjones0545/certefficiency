@@ -421,6 +421,7 @@ export default function Home() {
 
       // Immediately invalidate messages so the user message appears without waiting for polling
       queryClient.invalidateQueries({ queryKey: ["messages", targetConvId] });
+      queryClient.invalidateQueries({ queryKey: getGetConversationQueryKey(targetConvId) });
       devLog("messages_invalidated", { corrId, conversation_id: targetConvId, job_id: jobId });
 
       // Resolution signals Composer to clear text (§13)

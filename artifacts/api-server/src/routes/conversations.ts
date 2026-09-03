@@ -14,6 +14,7 @@ import { sarahJobsTable, userCertificationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import type { Logger } from "pino";
 import { dispatchSarahMessage, initSarahConversation } from "../lib/sarah/dispatch";
+import { detectCertificationCode } from "../lib/certificationDetection";
 
 const router = Router();
 
@@ -268,20 +269,46 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res): Promis
     .orderBy(desc(messagesTable.createdAt))
     .limit(10);
 
+  let certificationId = conv.certificationId;
   let certName: string | null = null;
   let examDate: string | null = null;
-  if (conv.certificationId) {
-    const [cert] = await db.select({ name: certificationsTable.name })
-      .from(certificationsTable)
-      .where(eq(certificationsTable.id, conv.certificationId))
-      .limit(1);
-    certName = cert?.name || null;
+  if (!certificationId) {
+    const detectedCode = detectCertificationCode(parsed.data.content);
+    if (detectedCode) {
+      const [detected] = await db.select({ id: certificationsTable.id, name: certificationsTable.name })
+        .from(certificationsTable)
+        .where(eq(certificationsTable.code, detectedCode))
+        .limit(1);
+      if (detected) {
+        certificationId = detected.id;
+        certName = detected.name;
+        await db.update(conversationsTable)
+          .set({ certificationId: detected.id, updatedAt: new Date() })
+          .where(and(
+            eq(conversationsTable.id, conv.id),
+            eq(conversationsTable.userId, req.userId!),
+          ));
+        req.log.info(
+          { correlationId, conversationId: conv.id, certificationCode: detectedCode },
+          "conversation.certification_detected",
+        );
+      }
+    }
+  }
+  if (certificationId) {
+    if (!certName) {
+      const [cert] = await db.select({ name: certificationsTable.name })
+        .from(certificationsTable)
+        .where(eq(certificationsTable.id, certificationId))
+        .limit(1);
+      certName = cert?.name || null;
+    }
 
     const [uc] = await db.select({ examDate: userCertificationsTable.examDate })
       .from(userCertificationsTable)
       .where(and(
         eq(userCertificationsTable.userId, req.userId!),
-        eq(userCertificationsTable.certificationId, conv.certificationId),
+        eq(userCertificationsTable.certificationId, certificationId),
       ))
       .limit(1);
     examDate = uc?.examDate || null;
@@ -389,7 +416,7 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res): Promis
     userId: req.userId!,
     conversationId: conv.id,
     mode: conv.mode,
-    certificationId: conv.certificationId,
+    certificationId,
     certName,
     examDate,
     messageId: userMessageId,
