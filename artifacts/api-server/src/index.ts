@@ -59,15 +59,19 @@ async function initStripe(): Promise<void> {
     await runMigrations({ databaseUrl, schema: "stripe" });
     logger.info("stripe_schema_ready");
 
-    const { getStripeSync } = await import("./lib/stripeClient");
+    const { getStripeSync, getStripeWebhookUrl } = await import(
+      "./lib/stripeClient"
+    );
     const stripeSync = await getStripeSync();
 
-    const domains = process.env.REPLIT_DOMAINS || "";
-    const primaryDomain = domains.split(",")[0];
-    if (primaryDomain) {
-      const webhookUrl = `https://${primaryDomain}/api/stripe/webhook`;
+    const webhookUrl = getStripeWebhookUrl();
+    if (webhookUrl) {
       await stripeSync.findOrCreateManagedWebhook(webhookUrl);
       logger.info({ webhookUrl }, "stripe_webhook_configured");
+    } else {
+      logger.warn(
+        "No Stripe webhook URL could be resolved; set STRIPE_WEBHOOK_URL or CERTEFFICIENCY_PUBLIC_URL",
+      );
     }
 
     // Backfill in background — non-blocking

@@ -10,6 +10,11 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required env: `DATABASE_URL` — Postgres connection string
+- Stripe production env: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
+  `CERTEFFICIENCY_PUBLIC_URL=https://www.certefficiency.com`. An exact
+  `STRIPE_WEBHOOK_URL` can override the derived webhook endpoint.
+- The Replit Stripe connector remains a development fallback when explicit
+  Stripe secrets are not set.
 
 ## Stack
 
