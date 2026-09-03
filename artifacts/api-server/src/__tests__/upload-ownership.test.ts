@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   unlink: vi.fn((_path: string, callback: () => void) => callback()),
   eq: vi.fn((column, value) => ({ column, value })),
   and: vi.fn((...conditions) => ({ conditions })),
+  savePrivateUpload: vi.fn(),
 }));
 
 vi.mock("multer", () => {
@@ -94,6 +95,15 @@ vi.mock("../lib/logger.js", () => ({
   logger: { info: vi.fn(), error: vi.fn(), warn: vi.fn() },
 }));
 
+vi.mock("../lib/objectStorage.js", () => ({
+  ObjectNotFoundError: class ObjectNotFoundError extends Error {},
+  ObjectStorageService: class ObjectStorageService {
+    savePrivateUpload = mocks.savePrivateUpload;
+    getObjectEntityFile = vi.fn();
+    deleteObjectEntity = vi.fn();
+  },
+}));
+
 vi.mock("../lib/uploadInspection.js", () => ({
   inspectUploadedFile: vi.fn(async () => undefined),
   UploadInspectionError: class UploadInspectionError extends Error {},
@@ -113,6 +123,9 @@ describe("upload conversation ownership", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mocks.selectResult = [];
+    delete process.env.PRIVATE_OBJECT_DIR;
+    process.env.NODE_ENV = "test";
+    mocks.savePrivateUpload.mockResolvedValue("/objects/uploads/fake-upload.txt");
     mocks.insert.mockReturnValue({
       values: vi.fn(() => ({
         returning: vi.fn(async () => [
@@ -157,5 +170,27 @@ describe("upload conversation ownership", () => {
     expect(response.status).toBe(201);
     expect(mocks.insert).toHaveBeenCalledOnce();
     expect(mocks.unlink).not.toHaveBeenCalled();
+  });
+
+  it("persists validated uploads to private object storage when configured", async () => {
+    process.env.PRIVATE_OBJECT_DIR = "/private-bucket/app";
+    mocks.selectResult = [
+      { id: "6c69fb10-cdb3-4da6-a264-c711c42ced8e" },
+    ];
+
+    const response = await request(app).post("/api/uploads").send({
+      conversationId: "6c69fb10-cdb3-4da6-a264-c711c42ced8e",
+    });
+
+    expect(response.status).toBe(201);
+    expect(mocks.savePrivateUpload).toHaveBeenCalledWith(
+      "fake-upload.txt",
+      "/tmp/fake-upload.txt",
+      "text/plain",
+    );
+    expect(mocks.unlink).toHaveBeenCalledWith(
+      "/tmp/fake-upload.txt",
+      expect.any(Function),
+    );
   });
 });

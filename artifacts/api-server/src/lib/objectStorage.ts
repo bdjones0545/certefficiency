@@ -159,6 +159,32 @@ export class ObjectStorageService {
     return objectFile;
   }
 
+  /** Persist a server-validated temporary file in the private Replit bucket. */
+  async savePrivateUpload(
+    filename: string,
+    localPath: string,
+    contentType: string,
+  ): Promise<string> {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,255}$/.test(filename)) {
+      throw new Error('Invalid private upload filename');
+    }
+    const privateDir = this.getPrivateObjectDir().replace(/\/$/, '');
+    const fullPath = `${privateDir}/uploads/${filename}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    await objectStorageClient.bucket(bucketName).upload(localPath, {
+      destination: objectName,
+      metadata: { contentType },
+      resumable: false,
+    });
+    return `/objects/uploads/${filename}`;
+  }
+
+  /** Delete a private object previously returned by savePrivateUpload. */
+  async deleteObjectEntity(objectPath: string): Promise<void> {
+    const objectFile = await this.getObjectEntityFile(objectPath);
+    await objectFile.delete({ ignoreNotFound: true });
+  }
+
   normalizeObjectEntityPath(rawPath: string): string {
     if (!rawPath.startsWith('https://storage.googleapis.com/')) {
       return rawPath;

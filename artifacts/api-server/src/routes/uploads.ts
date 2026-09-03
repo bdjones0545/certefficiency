@@ -11,6 +11,7 @@ import { logger } from "../lib/logger";
 import { generateSignedUploadUrl, getPublicBaseUrl, verifySignedToken } from "../lib/uploads-signing";
 import jwt from "jsonwebtoken";
 import { inspectUploadedFile, UploadInspectionError } from "../lib/uploadInspection";
+import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,6 +33,42 @@ const ALL_ALLOWED_MIME_TYPES = [
 ];
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const objectStorage = new ObjectStorageService();
+
+function durableUploadsEnabled(): boolean {
+  return Boolean(process.env.PRIVATE_OBJECT_DIR?.trim());
+}
+
+function unlinkTemporaryFile(filePath: string): Promise<void> {
+  return new Promise((resolve) => fs.unlink(filePath, () => resolve()));
+}
+
+async function persistValidatedUpload(file: Express.Multer.File): Promise<string> {
+  if (durableUploadsEnabled()) {
+    const objectPath = await objectStorage.savePrivateUpload(
+      file.filename,
+      file.path,
+      file.mimetype,
+    );
+    await unlinkTemporaryFile(file.path);
+    return objectPath;
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Private object storage is required for production uploads");
+  }
+  return file.path;
+}
+
+async function deleteStoredUpload(storagePath: string | null): Promise<void> {
+  if (!storagePath) return;
+  if (storagePath.startsWith("/objects/")) {
+    await objectStorage.deleteObjectEntity(storagePath).catch((error) => {
+      if (!(error instanceof ObjectNotFoundError)) throw error;
+    });
+    return;
+  }
+  await unlinkTemporaryFile(storagePath);
+}
 
 function encodeContentDispositionFilename(filename: string): string {
   return encodeURIComponent(filename).replace(
@@ -128,8 +165,10 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
       "image_upload_route_entered",
     );
 
+    let persistedStoragePath: string | null = null;
     try {
       await inspectUploadedFile(file);
+      persistedStoragePath = await persistValidatedUpload(file);
       reqLog.info(
         { userId: req.userId, mimeType: file.mimetype, sizeBytes: file.size },
         "image_upload_validated",
@@ -142,7 +181,7 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
         originalFilename: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: file.size,
-        storagePath: file.path,
+        storagePath: persistedStoragePath,
         status: "ready",
       }).returning();
 
@@ -167,7 +206,8 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
         },
       });
     } catch (e) {
-      fs.unlink(file.path, () => {});
+      if (persistedStoragePath) await deleteStoredUpload(persistedStoragePath).catch(() => undefined);
+      else await unlinkTemporaryFile(file.path);
       if (e instanceof UploadInspectionError) {
         res.status(400).json({ error: e.message });
         return;
@@ -198,6 +238,7 @@ router.post("/uploads", requireAuth, (req, res, next) => {
     const { conversationId } = req.body;
     const file = req.file;
 
+    let persistedStoragePath: string | null = null;
     try {
       await inspectUploadedFile(file);
 
@@ -214,11 +255,13 @@ router.post("/uploads", requireAuth, (req, res, next) => {
           .limit(1);
 
         if (!conversation) {
-          fs.unlink(file.path, () => {});
+          await unlinkTemporaryFile(file.path);
           res.status(404).json({ error: "Conversation not found" });
           return;
         }
       }
+
+      persistedStoragePath = await persistValidatedUpload(file);
 
       const [record] = await db.insert(uploadsTable).values({
         userId: req.userId!,
@@ -227,13 +270,14 @@ router.post("/uploads", requireAuth, (req, res, next) => {
         originalFilename: file.originalname,
         mimeType: file.mimetype,
         sizeBytes: file.size,
-        storagePath: file.path,
+        storagePath: persistedStoragePath,
         status: "processing",
       }).returning();
 
       res.status(201).json(record);
     } catch (e) {
-      fs.unlink(file.path, () => {});
+      if (persistedStoragePath) await deleteStoredUpload(persistedStoragePath).catch(() => undefined);
+      else await unlinkTemporaryFile(file.path);
       if (e instanceof UploadInspectionError) {
         res.status(400).json({ error: e.message });
         return;
@@ -303,22 +347,46 @@ router.get("/uploads/:id/file", async (req, res): Promise<void> => {
     return;
   }
 
-  if (!record.storagePath || !fs.existsSync(record.storagePath)) {
-    logger.error({ uploadId }, "Upload file missing from disk");
+  if (!record.storagePath) {
+    logger.error({ uploadId }, "Upload storage reference missing");
     res.status(404).json({ error: "File not found on server." });
     return;
   }
 
-  res.setHeader("Content-Type", record.mimeType);
   const asciiFilename = path.basename(record.originalFilename)
     .replace(/[^\x20-\x7e]/g, "_")
     .replace(/["\\]/g, "_");
   const encodedFilename = encodeContentDispositionFilename(path.basename(record.originalFilename));
+  res.setHeader("Content-Type", record.mimeType);
   res.setHeader(
     "Content-Disposition",
     `inline; filename="${asciiFilename}"; filename*=UTF-8''${encodedFilename}`,
   );
   res.setHeader("Cache-Control", "private, max-age=3600");
+
+  if (record.storagePath.startsWith("/objects/")) {
+    try {
+      const objectFile = await objectStorage.getObjectEntityFile(record.storagePath);
+      const [metadata] = await objectFile.getMetadata();
+      if (metadata.size) res.setHeader("Content-Length", String(metadata.size));
+      objectFile.createReadStream().on("error", (error) => {
+        logger.error({ uploadId, err: error }, "Upload object stream failed");
+        if (!res.headersSent) res.status(404).json({ error: "File not found." });
+        else res.destroy(error);
+      }).pipe(res);
+      return;
+    } catch (error) {
+      logger.error({ uploadId, err: error }, "Upload object missing");
+      res.status(404).json({ error: "File not found on server." });
+      return;
+    }
+  }
+
+  if (!fs.existsSync(record.storagePath)) {
+    logger.error({ uploadId }, "Upload file missing from disk");
+    res.status(404).json({ error: "File not found on server." });
+    return;
+  }
 
   fs.createReadStream(record.storagePath).pipe(res);
 });
@@ -344,9 +412,7 @@ router.delete("/uploads/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  if (record.storagePath && fs.existsSync(record.storagePath)) {
-    fs.unlink(record.storagePath, () => {});
-  }
+  await deleteStoredUpload(record.storagePath);
 
   await db.delete(uploadsTable).where(eq(uploadsTable.id, record.id));
   res.sendStatus(204);
