@@ -7,6 +7,7 @@
  */
 
 export interface MessageInput {
+  /** @minLength 1 */
   content: string;
   uploadIds?: string[];
 }

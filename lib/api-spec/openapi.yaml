@@ -1140,6 +1140,7 @@ components:
       properties:
         content:
           type: string
+          minLength: 1
         uploadIds:
           type: array
           items:
@@ -1274,10 +1275,12 @@ components:
           default: 50
           minimum: 10
           maximum: 100
+          multipleOf: 1
         timeLimitMinutes:
           type: ["integer", "null"]
           minimum: 5
           maximum: 480
+          multipleOf: 1
 
     MockExam:
       type: object

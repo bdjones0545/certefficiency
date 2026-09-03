@@ -392,8 +392,11 @@ export const SendMessageParams = zod.object({
   "id": zod.coerce.string()
 })
 
+
+
+
 export const SendMessageBody = zod.object({
-  "content": zod.string(),
+  "content": zod.string().min(1),
   "uploadIds": zod.array(zod.string()).optional()
 })
 
@@ -509,16 +512,18 @@ export const SubmitAnswerResponse = zod.object({
 export const createMockExamBodyQuestionCountDefault = 50;
 export const createMockExamBodyQuestionCountMin = 10;
 export const createMockExamBodyQuestionCountMax = 100;
+export const createMockExamBodyQuestionCountMultipleOf = 1;
 
 export const createMockExamBodyTimeLimitMinutesMin = 5;
 export const createMockExamBodyTimeLimitMinutesMax = 480;
+export const createMockExamBodyTimeLimitMinutesMultipleOf = 1;
 
 
 
 export const CreateMockExamBody = zod.object({
   "certificationId": zod.string(),
-  "questionCount": zod.number().min(createMockExamBodyQuestionCountMin).max(createMockExamBodyQuestionCountMax).default(createMockExamBodyQuestionCountDefault),
-  "timeLimitMinutes": zod.number().min(createMockExamBodyTimeLimitMinutesMin).max(createMockExamBodyTimeLimitMinutesMax).nullish()
+  "questionCount": zod.number().min(createMockExamBodyQuestionCountMin).max(createMockExamBodyQuestionCountMax).multipleOf(createMockExamBodyQuestionCountMultipleOf).default(createMockExamBodyQuestionCountDefault),
+  "timeLimitMinutes": zod.number().min(createMockExamBodyTimeLimitMinutesMin).max(createMockExamBodyTimeLimitMinutesMax).multipleOf(createMockExamBodyTimeLimitMinutesMultipleOf).nullish()
 })
 
 export const CreateMockExamResponse = zod.object({
