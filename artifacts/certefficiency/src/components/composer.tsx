@@ -131,7 +131,7 @@ export const Composer: React.FC<ComposerProps> = ({
     <div className="px-4 py-4 w-full max-w-4xl mx-auto glass pb-safe">
       {/* ── Image preview strip ──────────────────────────────────────── */}
       {pendingImages.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
+        <div className="flex flex-wrap gap-2 mb-3" aria-label="Selected images">
           {pendingImages.map((img) => (
             <div
               key={img.localId}
@@ -140,16 +140,20 @@ export const Composer: React.FC<ComposerProps> = ({
               <img
                 src={img.previewUrl}
                 alt={img.file.name}
+                width={80}
+                height={80}
                 className="w-full h-full object-cover"
               />
               {img.status === "uploading" && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  <Loader2 className="w-5 h-5 text-white animate-spin" aria-hidden="true" />
+                  <span className="sr-only">Uploading {img.file.name}</span>
                 </div>
               )}
               {img.status === "failed" && (
                 <div className="absolute inset-0 bg-destructive/70 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-white" />
+                  <AlertCircle className="w-5 h-5 text-white" aria-hidden="true" />
+                  <span className="sr-only">Upload failed for {img.file.name}</span>
                 </div>
               )}
               <button
@@ -167,7 +171,7 @@ export const Composer: React.FC<ComposerProps> = ({
 
       {/* ── Upload / pick errors ─────────────────────────────────────── */}
       {(pickError || pendingImages.some((p) => p.error)) && (
-        <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg mb-3">
+        <div role="alert" className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg mb-3">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
           <span>{pickError ?? pendingImages.find((p) => p.error)?.error}</span>
         </div>
@@ -190,6 +194,7 @@ export const Composer: React.FC<ComposerProps> = ({
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask Sarah anything..."
+          aria-label="Message Sarah"
           disabled={disabled || submitting}
           className="w-full max-h-[120px] bg-transparent resize-none outline-none py-3 text-[17px] leading-relaxed hide-scrollbar disabled:opacity-50"
           rows={1}
@@ -204,6 +209,7 @@ export const Composer: React.FC<ComposerProps> = ({
             onClick={handleImageButtonClick}
             disabled={disabled || isUploading || submitting}
             title="Upload image"
+            aria-label={isUploading ? "Uploading image" : "Upload image"}
           >
             {isUploading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -222,6 +228,7 @@ export const Composer: React.FC<ComposerProps> = ({
             }`}
             disabled={!canSend}
             onClick={() => void handleSubmit()}
+            aria-label={submitting ? "Sending message" : "Send message"}
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />

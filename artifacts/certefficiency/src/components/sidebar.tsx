@@ -134,7 +134,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
         </Button>
 
         {newChatError && (
-          <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
+          <div role="alert" className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{newChatError}</span>
           </div>
@@ -145,7 +145,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
         <div className="px-3 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Conversations</div>
 
         {deleteError && (
-          <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg mb-1">
+          <div role="alert" className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg mb-1">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
             <span>{deleteError}</span>
           </div>
@@ -154,22 +154,25 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
         {conversations?.map((conv) => (
           <div
             key={conv.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => setLocation(`/?c=${conv.id}`)}
-            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") setLocation(`/?c=${conv.id}`); }}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors group",
+              "flex items-center rounded-xl transition-colors group",
               activeId === conv.id ? "bg-black/5 font-medium" : "hover:bg-black/5"
             )}
           >
-            {getModeIcon(conv.mode)}
-            <span className="flex-1 truncate text-[15px]">{conv.title || "New Conversation"}</span>
-            {/* Delete button — stops propagation so it doesn't navigate */}
             <button
+              type="button"
+              onClick={() => setLocation(`/?c=${conv.id}`)}
+              aria-current={activeId === conv.id ? "page" : undefined}
+              className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left"
+            >
+              {getModeIcon(conv.mode)}
+              <span className="flex-1 truncate text-[15px]">{conv.title || "New Conversation"}</span>
+            </button>
+            <button
+              type="button"
               aria-label={`Delete conversation: ${conv.title || "New Conversation"}`}
-              onClick={(e) => { e.stopPropagation(); setPendingDeleteId(conv.id); setDeleteError(null); }}
-              className="opacity-0 group-hover:opacity-100 focus:opacity-100 w-6 h-6 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all shrink-0"
+              onClick={() => { setPendingDeleteId(conv.id); setDeleteError(null); }}
+              className="mr-2 opacity-0 group-hover:opacity-100 focus:opacity-100 w-7 h-7 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all shrink-0"
             >
               {deleteConv.isPending && pendingDeleteId === conv.id
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -204,7 +207,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
       <div className="p-4 border-t border-sidebar-border bg-sidebar mt-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-3 hover:bg-black/5 p-2 rounded-xl cursor-pointer transition-colors">
+            <button type="button" aria-label="Open account menu" className="flex w-full items-center gap-3 hover:bg-black/5 p-2 rounded-xl cursor-pointer transition-colors text-left">
               <Avatar className="h-10 w-10 border border-black/5">
                 <AvatarFallback className="bg-primary/10 text-primary">{getInitials(me?.name || "")}</AvatarFallback>
               </Avatar>
@@ -213,7 +216,7 @@ export const Sidebar = ({ className, currentConversationId }: { className?: stri
                 <p className="text-[13px] text-muted-foreground truncate leading-tight">{me?.plan === "guest" ? "Guest User" : "Pro Plan"}</p>
               </div>
               <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
-            </div>
+            </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56" align="end">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>

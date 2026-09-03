@@ -52,7 +52,7 @@ export const AttachmentImage: React.FC<AttachmentImageProps> = ({
 
   if (error) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-1" role="status">
         <ImageIcon className="w-4 h-4" />
         <span>Image unavailable</span>
       </div>
@@ -61,8 +61,9 @@ export const AttachmentImage: React.FC<AttachmentImageProps> = ({
 
   if (!src) {
     return (
-      <div className="w-48 h-32 bg-muted animate-pulse rounded-xl flex items-center justify-center">
+      <div className="w-48 h-32 bg-muted animate-pulse rounded-xl flex items-center justify-center" role="status">
         <ImageIcon className="w-6 h-6 text-muted-foreground" />
+        <span className="sr-only">Loading image</span>
       </div>
     );
   }
@@ -71,6 +72,8 @@ export const AttachmentImage: React.FC<AttachmentImageProps> = ({
     <img
       src={src}
       alt={alt}
+      loading="lazy"
+      decoding="async"
       className={className ?? "max-w-sm max-h-64 rounded-xl border border-border shadow-sm object-contain"}
     />
   );

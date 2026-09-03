@@ -325,8 +325,9 @@ function R2VideoPlayer({
 
   if (fetching) {
     return (
-      <div className="w-full aspect-video bg-[#0a0a0a] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-white/30 animate-spin" />
+      <div className="w-full aspect-video bg-[#0a0a0a] flex items-center justify-center" role="status">
+        <Loader2 className="w-8 h-8 text-white/30 animate-spin" aria-hidden="true" />
+        <span className="sr-only">Loading video</span>
       </div>
     );
   }
@@ -379,13 +380,13 @@ function PremiumOverlay({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backdropFilter: "blur(20px)", backgroundColor: "rgba(0,0,0,0.7)" }}
     >
-      <div className="bg-[#111] border border-white/10 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="premium-overlay-title" className="bg-[#111] border border-white/10 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="px-5 sm:px-8 pt-8 sm:pt-10 pb-5 sm:pb-6 text-center border-b border-white/10">
           <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4 sm:mb-5">
             <Lock className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">You've completed the free lesson.</h2>
+          <h2 id="premium-overlay-title" className="text-xl sm:text-2xl font-bold text-white mb-2">You've completed the free lesson.</h2>
           <p className="text-white/50 text-[14px] sm:text-[15px] leading-relaxed">
             Continue building your own production-ready AI agent by unlocking the complete course.
           </p>

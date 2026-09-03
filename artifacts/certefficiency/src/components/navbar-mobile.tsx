@@ -184,14 +184,14 @@ export const NavbarMobile = () => {
             </div>
 
             {newChatError && (
-              <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
+              <div role="alert" className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{newChatError}</span>
               </div>
             )}
 
             {deleteError && (
-              <div className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
+              <div role="alert" className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg">
                 <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                 <span>{deleteError}</span>
               </div>
@@ -207,23 +207,27 @@ export const NavbarMobile = () => {
             {conversations?.map((conv) => (
               <div
                 key={conv.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleSelectConv(conv.id)}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") handleSelectConv(conv.id); }}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors group min-h-[44px]",
+                  "flex items-center rounded-xl transition-colors group min-h-[44px]",
                   activeConvId === conv.id ? "bg-primary/10 text-primary" : "hover:bg-black/5"
                 )}
               >
-                <span className={cn("shrink-0", activeConvId === conv.id ? "text-primary" : "text-muted-foreground")}>
-                  {getModeIcon(conv.mode)}
-                </span>
-                <span className="flex-1 truncate text-[14px]">{conv.title || "New Conversation"}</span>
                 <button
+                  type="button"
+                  onClick={() => handleSelectConv(conv.id)}
+                  aria-current={activeConvId === conv.id ? "page" : undefined}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left"
+                >
+                  <span className={cn("shrink-0", activeConvId === conv.id ? "text-primary" : "text-muted-foreground")}>
+                    {getModeIcon(conv.mode)}
+                  </span>
+                  <span className="flex-1 truncate text-[14px]">{conv.title || "New Conversation"}</span>
+                </button>
+                <button
+                  type="button"
                   aria-label={`Delete conversation: ${conv.title || "New Conversation"}`}
-                  onClick={(e) => { e.stopPropagation(); setPendingDeleteId(conv.id); setDeleteError(null); }}
-                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 w-7 h-7 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all shrink-0"
+                  onClick={() => { setPendingDeleteId(conv.id); setDeleteError(null); }}
+                  className="mr-2 opacity-0 group-hover:opacity-100 focus:opacity-100 w-7 h-7 flex items-center justify-center rounded-md hover:bg-destructive/10 hover:text-destructive text-muted-foreground transition-all shrink-0"
                 >
                   {deleteConv.isPending && pendingDeleteId === conv.id
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

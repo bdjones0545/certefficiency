@@ -111,8 +111,10 @@ function LessonCard({
 
   return (
     <button
+      type="button"
       onClick={onClick}
       disabled={!isAccessible}
+      aria-current={isActive ? "true" : undefined}
       className={cn(
         "w-full text-left p-4 rounded-2xl border transition-all duration-200 group",
         isActive
@@ -202,13 +204,13 @@ function PremiumOverlay({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ backgroundColor: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)" }}
     >
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
+      <div role="dialog" aria-modal="true" aria-labelledby="course-unlock-title" className="w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-300 max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-5 sm:px-8 py-6 sm:py-8 text-center">
           <div className="w-16 h-16 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center mx-auto mb-4">
             <Lock className="w-8 h-8 text-amber-400" />
           </div>
-          <h2 className="text-2xl font-bold text-white">Ready for the rest?</h2>
+          <h2 id="course-unlock-title" className="text-2xl font-bold text-white">Ready for the rest?</h2>
           <p className="text-gray-400 mt-2 text-[15px] leading-relaxed">
             Unlock the remaining lessons and complete the entire Practical &amp; Applied course.
           </p>

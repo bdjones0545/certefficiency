@@ -170,7 +170,10 @@ export default function Exam({ params }: { params: { id: string } }) {
                 return (
                   <button
                     key={q.id}
+                    type="button"
                     onClick={() => setCurrentIndex(i)}
+                    aria-label={`Question ${i + 1}${isAnswered ? ", answered" : ""}${isFlagged ? ", flagged" : ""}`}
+                    aria-current={isCurrent ? "step" : undefined}
                     className={cn(
                       "aspect-square rounded-lg flex items-center justify-center font-medium text-sm transition-colors border",
                       isCurrent ? "ring-2 ring-primary ring-offset-2" : "",
