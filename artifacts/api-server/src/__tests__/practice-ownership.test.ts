@@ -45,14 +45,18 @@ vi.mock("@workspace/db", () => {
   };
 });
 
-vi.mock("../lib/auth", () => ({
-  requireAuth: (req: express.Request, _res: express.Response, next: express.NextFunction) => {
+vi.mock("../lib/auth.js", () => ({
+  requireAuth: (
+    req: express.Request,
+    _res: express.Response,
+    next: express.NextFunction,
+  ) => {
     req.userId = "attacker-user-id";
     next();
   },
 }));
 
-vi.mock("../lib/sarah", () => ({
+vi.mock("../lib/sarah/index.js", () => ({
   sarah: sarahMocks,
 }));
 

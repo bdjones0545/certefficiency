@@ -1,20 +1,30 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import router from "./routes";
 import { logger } from "./lib/logger";
-import { WebhookHandlers } from "./lib/webhookHandlers";
+import {
+  StripeWebhookVerificationError,
+  WebhookHandlers,
+} from "./lib/webhookHandlers";
 
 const app: Express = express();
 
 app.set("trust proxy", 1);
 
 // Security headers
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: "cross-origin" },
-}));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  }),
+);
 
 // Logging
 app.use(
@@ -54,9 +64,14 @@ const _allowedOrigins = process.env.ALLOWED_ORIGINS;
  * express-cors never performs substring or suffix matching on an array.
  */
 function parseAndValidateOrigins(raw: string, isProd: boolean): string[] {
-  const entries = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const entries = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   if (entries.length === 0) {
-    throw new Error("FATAL: ALLOWED_ORIGINS is set but contains no valid entries.");
+    throw new Error(
+      "FATAL: ALLOWED_ORIGINS is set but contains no valid entries.",
+    );
   }
 
   const validated: string[] = [];
@@ -66,7 +81,7 @@ function parseAndValidateOrigins(raw: string, isProd: boolean): string[] {
     if (entry.includes("*")) {
       throw new Error(
         `FATAL: ALLOWED_ORIGINS entry "${entry}" contains a wildcard. ` +
-        "Wildcard origins are not permitted for authenticated APIs.",
+          "Wildcard origins are not permitted for authenticated APIs.",
       );
     }
 
@@ -84,7 +99,7 @@ function parseAndValidateOrigins(raw: string, isProd: boolean): string[] {
     if (entry !== canonical) {
       throw new Error(
         `FATAL: ALLOWED_ORIGINS entry "${entry}" must be an exact origin ` +
-        `(scheme + host only, no path/query/fragment). Expected: "${canonical}"`,
+          `(scheme + host only, no path/query/fragment). Expected: "${canonical}"`,
       );
     }
 
@@ -92,7 +107,7 @@ function parseAndValidateOrigins(raw: string, isProd: boolean): string[] {
     if (isProd && parsed.protocol !== "https:") {
       throw new Error(
         `FATAL: ALLOWED_ORIGINS entry "${entry}" uses "${parsed.protocol}" ` +
-        "which is not allowed in production. All origins must use https://.",
+          "which is not allowed in production. All origins must use https://.",
       );
     }
 
@@ -105,8 +120,8 @@ function parseAndValidateOrigins(raw: string, isProd: boolean): string[] {
 if (_isProd && !_allowedOrigins) {
   throw new Error(
     "FATAL: ALLOWED_ORIGINS must be set in production. " +
-    "Set a comma-separated list of allowed origins (e.g. https://certefficiency.com) " +
-    "in Replit Secrets.",
+      "Set a comma-separated list of allowed origins (e.g. https://certefficiency.com) " +
+      "in Replit Secrets.",
   );
 }
 
@@ -118,28 +133,37 @@ if (_parsedOrigins) {
   logger.info({ allowedOrigins: _parsedOrigins }, "cors_origins_configured");
 }
 
-app.use(cors({
-  origin: _parsedOrigins ?? true,
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: _parsedOrigins ?? true,
+    credentials: true,
+  }),
+);
 
 // Global rate limit
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 min
-  max: 500,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many requests, please slow down." },
-}));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 min
+    max: 500,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many requests, please slow down." },
+  }),
+);
 
 // Auth-specific rate limit (stricter)
-app.use(["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password"], rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many authentication attempts, please try again later." },
-}));
+app.use(
+  ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password"],
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error: "Too many authentication attempts, please try again later.",
+    },
+  }),
+);
 
 // Conversation creation — prevents rapid new-conversation spam.
 // IMPORTANT: skip must be applied so that only POST /api/conversations
@@ -148,47 +172,61 @@ app.use(["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password"], 
 // this budget — they fire continuously during normal chat and would exhaust
 // max:20 after just a few message exchanges, producing 429s mid-conversation.
 // Message sends have their own dedicated 120/15-min limiter below.
-app.use("/api/conversations", rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  skip: (req) => {
-    // req.originalUrl is always the full path even inside app.use() mounts.
-    const path = req.originalUrl.split("?")[0];
-    // Only count new-conversation POSTs; skip everything else.
-    return !(req.method === "POST" && /^\/api\/conversations\/?$/.test(path));
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many conversations created. Please slow down." },
-}));
+app.use(
+  "/api/conversations",
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    skip: (req) => {
+      // req.originalUrl is always the full path even inside app.use() mounts.
+      const path = req.originalUrl.split("?")[0];
+      // Only count new-conversation POSTs; skip everything else.
+      return !(req.method === "POST" && /^\/api\/conversations\/?$/.test(path));
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many conversations created. Please slow down." },
+  }),
+);
 
 // Message sending — prevents automated message floods while allowing
 // normal multi-turn tutoring sessions (120 messages per 15 min ≈ 8/min)
-app.use(/^\/api\/conversations\/[^/]+\/messages$/, rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 120,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many messages sent. Please slow down." },
-}));
+app.use(
+  /^\/api\/conversations\/[^/]+\/messages$/,
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many messages sent. Please slow down." },
+  }),
+);
 
 // Retry endpoints — prevent retry storms
-app.use(["/api/messages/:id/retry", "/api/sarah/jobs/:id/retry"], rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many retry attempts. Please wait before retrying." },
-}));
+app.use(
+  ["/api/messages/:id/retry", "/api/sarah/jobs/:id/retry"],
+  rateLimit({
+    windowMs: 5 * 60 * 1000,
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many retry attempts. Please wait before retrying." },
+  }),
+);
 
 // Upload rate limit — prevent attachment abuse
-app.use(["/api/uploads", "/api/uploads/images"], rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: "Too many uploads. Please wait before uploading more files." },
-}));
+app.use(
+  ["/api/uploads", "/api/uploads/images"],
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+      error: "Too many uploads. Please wait before uploading more files.",
+    },
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Stripe webhook — MUST be registered BEFORE express.json() so the raw Buffer
@@ -210,7 +248,15 @@ app.post(
       res.status(200).json({ received: true });
     } catch (err: unknown) {
       logger.error({ err }, "stripe_webhook_error");
-      res.status(400).json({ error: "Webhook processing error" });
+      if (err instanceof StripeWebhookVerificationError) {
+        res.status(400).json({ error: "Invalid webhook signature" });
+        return;
+      }
+
+      // Return 5xx for credential, Stripe sync, and application persistence
+      // failures. Stripe retries webhook deliveries only when we do not
+      // acknowledge them as successfully processed.
+      res.status(500).json({ error: "Webhook processing failed" });
     }
   },
 );
@@ -230,7 +276,8 @@ app.use((_req: Request, res: Response) => {
 
 // Global error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const message = err instanceof Error ? err.message : "An unexpected error occurred";
+  const message =
+    err instanceof Error ? err.message : "An unexpected error occurred";
   const status = (err as { status?: number }).status ?? 500;
 
   if (status >= 500) {
