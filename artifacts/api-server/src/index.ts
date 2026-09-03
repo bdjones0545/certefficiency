@@ -56,7 +56,8 @@ async function initStripe(): Promise<void> {
   try {
     const { runMigrations } = await import("stripe-replit-sync");
     logger.info("stripe_migrations_started");
-    await runMigrations({ databaseUrl, schema: "stripe" });
+    // stripe-replit-sync always owns and migrates its `stripe` schema.
+    await runMigrations({ databaseUrl });
     logger.info("stripe_schema_ready");
 
     const { getStripeSync, getStripeWebhookUrl } = await import(

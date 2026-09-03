@@ -16,6 +16,10 @@ import type { Request } from "express";
 
 const router = Router();
 
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function getBaseUrl(req: Request): string {
   const origin = req.headers.origin as string | undefined;
   if (origin) return origin;
@@ -71,7 +75,7 @@ router.get("/platform/courses/:courseSlug", optionalAuth, async (req, res): Prom
   const [course] = await db
     .select()
     .from(platformCoursesTable)
-    .where(eq(platformCoursesTable.slug, req.params.courseSlug))
+    .where(eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)))
     .limit(1);
 
   if (!course || !course.published) {
@@ -170,7 +174,7 @@ router.get(
     const [course] = await db
       .select()
       .from(platformCoursesTable)
-      .where(eq(platformCoursesTable.slug, req.params.courseSlug))
+      .where(eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)))
       .limit(1);
 
     if (!course) {
@@ -206,7 +210,7 @@ router.post(
       .from(platformCoursesTable)
       .where(
         and(
-          eq(platformCoursesTable.slug, req.params.courseSlug),
+          eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)),
           eq(platformCoursesTable.published, true),
         ),
       )
@@ -311,7 +315,7 @@ router.post(
     const [course] = await db
       .select()
       .from(platformCoursesTable)
-      .where(eq(platformCoursesTable.slug, req.params.courseSlug))
+      .where(eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)))
       .limit(1);
     if (!course) { res.status(404).json({ error: "Course not found" }); return; }
 
@@ -320,7 +324,7 @@ router.post(
       .from(platformLessonsTable)
       .where(
         and(
-          eq(platformLessonsTable.id, req.params.lessonId),
+          eq(platformLessonsTable.id, routeParam(req.params.lessonId)),
           eq(platformLessonsTable.courseId, course.id),
         ),
       )
@@ -395,7 +399,7 @@ router.get(
     const [course] = await db
       .select()
       .from(platformCoursesTable)
-      .where(eq(platformCoursesTable.slug, req.params.courseSlug))
+      .where(eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)))
       .limit(1);
     if (!course) { res.status(404).json({ error: "Course not found" }); return; }
 
@@ -445,7 +449,7 @@ router.get(
       const [course] = await db
         .select()
         .from(platformCoursesTable)
-        .where(eq(platformCoursesTable.slug, req.params.courseSlug))
+        .where(eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)))
         .limit(1);
       if (!course) { res.status(404).end(); return; }
 
@@ -454,7 +458,7 @@ router.get(
         .from(platformLessonsTable)
         .where(
           and(
-            eq(platformLessonsTable.id, req.params.lessonId),
+            eq(platformLessonsTable.id, routeParam(req.params.lessonId)),
             eq(platformLessonsTable.courseId, course.id),
           ),
         )
@@ -492,7 +496,7 @@ router.get(
       const [course] = await db
         .select()
         .from(platformCoursesTable)
-        .where(eq(platformCoursesTable.slug, req.params.courseSlug))
+        .where(eq(platformCoursesTable.slug, routeParam(req.params.courseSlug)))
         .limit(1);
       if (!course || !course.published) {
         res.status(404).json({ error: "Course not found" });
@@ -504,7 +508,7 @@ router.get(
         .from(platformLessonsTable)
         .where(
           and(
-            eq(platformLessonsTable.id, req.params.lessonId),
+            eq(platformLessonsTable.id, routeParam(req.params.lessonId)),
             eq(platformLessonsTable.courseId, course.id),
           ),
         )
@@ -605,7 +609,8 @@ router.post(
   "/platform/courses/:courseSlug/lessons/:lessonId/playback",
   requireAuth,
   async (req, res): Promise<void> => {
-    const { courseSlug, lessonId } = req.params;
+    const courseSlug = routeParam(req.params.courseSlug);
+    const lessonId = routeParam(req.params.lessonId);
     const userId = req.userId!;
 
     logger.info({ userId, courseSlug, lessonId }, "course.playback.requested");

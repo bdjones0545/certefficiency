@@ -11,6 +11,7 @@ import {
   Message,
   useGetSarahJob,
   getGetConversationQueryKey,
+  getGetSarahJobQueryKey,
 } from "@workspace/api-client-react";
 import { isValidSarahJobId, extractSarahJobId } from "@/lib/sarah-job";
 import { useLocation, useSearch } from "wouter";
@@ -171,7 +172,7 @@ export default function Home() {
         enabled: !!conversationId,
         // Use a stable short key so all invalidations use the same format:
         //   ["messages", conversationId]
-        queryKey: conversationId ? ["messages", conversationId] : undefined,
+        queryKey: ["messages", conversationId ?? "disabled"],
         refetchInterval: (query) => {
           const msgs = query.state.data;
           // Keep polling until Sarah's opening message arrives, then stop
@@ -204,6 +205,7 @@ export default function Home() {
     activeJobId ?? "",
     {
       query: {
+        queryKey: getGetSarahJobQueryKey(activeJobId ?? ""),
         // Only fire when we have a syntactically valid UUID. This prevents
         // objects from coercing to "[object Object]" in the URL template literal.
         enabled: isValidJobId,
@@ -249,16 +251,14 @@ export default function Home() {
   useEffect(() => {
     const status = job?.status;
     if (status === "completed" || status === "failed") {
-      const corrId = job?.correlationId;
       devLog(status === "completed" ? "job_completed" : "job_failed", {
         job_id: activeJobId,
-        corrId,
         conversation_id: conversationId,
       });
       setActiveJobId(null);
       if (conversationId) {
         queryClient.invalidateQueries({ queryKey: ["messages", conversationId] });
-        devLog("messages_invalidated", { conversation_id: conversationId, corrId });
+        devLog("messages_invalidated", { conversation_id: conversationId });
       }
     }
   }, [job?.status, conversationId, queryClient, activeJobId]);
@@ -342,7 +342,7 @@ export default function Home() {
       attachment_count: attachmentIds.length,
     });
 
-    let targetConvId = conversationId;
+    let targetConvId = conversationId ?? "";
 
     // ── Create conversation if none is active ────────────────────────────
     if (!targetConvId) {
@@ -408,7 +408,7 @@ export default function Home() {
         console.error("[chat] sarah_job_id_invalid", {
           corrId,
           conversation_id: targetConvId,
-          rawType: typeof (res as Record<string, unknown>).jobId,
+          rawType: typeof (res as unknown as Record<string, unknown>).jobId,
         });
         setSendError("Sarah couldn't confirm your message was received. Please try again.");
       }

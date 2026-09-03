@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useGetMockExam, useSubmitMockExam, useSaveMockExamAnswers, MockExam, MockExamQuestion } from "@workspace/api-client-react";
+import { getGetMockExamQueryKey, useGetMockExam, useSubmitMockExam, useSaveMockExamAnswers, MockExam, MockExamQuestion } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -9,7 +9,9 @@ import ReactMarkdown from "react-markdown";
 
 export default function Exam({ params }: { params: { id: string } }) {
   const [, setLocation] = useLocation();
-  const { data: exam, isLoading } = useGetMockExam({ id: params.id }, { query: { enabled: !!params.id } });
+  const { data: exam, isLoading } = useGetMockExam(params.id, {
+    query: { enabled: !!params.id, queryKey: getGetMockExamQueryKey(params.id) },
+  });
   const submitMutation = useSubmitMockExam();
   const saveAnswers = useSaveMockExamAnswers();
 

@@ -1,12 +1,14 @@
 import React from "react";
-import { useGetMockExam } from "@workspace/api-client-react";
+import { getGetMockExamQueryKey, useGetMockExam } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { Trophy, ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 
 export default function ExamResults({ params }: { params: { id: string } }) {
-  const { data: exam, isLoading } = useGetMockExam({ id: params.id }, { query: { enabled: !!params.id } });
+  const { data: exam, isLoading } = useGetMockExam(params.id, {
+    query: { enabled: !!params.id, queryKey: getGetMockExamQueryKey(params.id) },
+  });
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center">Loading results...</div>;
   if (!exam) return <div className="min-h-screen flex items-center justify-center">Exam not found</div>;

@@ -10,6 +10,10 @@ import type { Request } from "express";
 
 const router = Router();
 
+function routeParam(value: string | string[]): string {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function getBaseUrl(req: Request): string {
   const origin = req.headers.origin as string | undefined;
   if (origin) return origin;
@@ -26,7 +30,7 @@ function getBaseUrl(req: Request): string {
 // Returns course info. Video embed URLs gated by access.
 // ---------------------------------------------------------------------------
 router.get("/courses/:courseId", optionalAuth, async (req, res): Promise<void> => {
-  const course = COURSES[req.params.courseId];
+  const course = COURSES[routeParam(req.params.courseId)];
   if (!course) {
     res.status(404).json({ error: "Course not found" });
     return;
@@ -76,7 +80,7 @@ router.get("/courses/:courseId", optionalAuth, async (req, res): Promise<void> =
 // Check if the authenticated user has purchased this course.
 // ---------------------------------------------------------------------------
 router.get("/courses/:courseId/access", requireAuth, async (req, res): Promise<void> => {
-  const course = COURSES[req.params.courseId];
+  const course = COURSES[routeParam(req.params.courseId)];
   if (!course) {
     res.status(404).json({ error: "Course not found" });
     return;
@@ -101,7 +105,7 @@ router.get("/courses/:courseId/access", requireAuth, async (req, res): Promise<v
 // Create a Stripe Checkout Session for the course.
 // ---------------------------------------------------------------------------
 router.post("/courses/:courseId/checkout", requireAuth, async (req, res): Promise<void> => {
-  const course = COURSES[req.params.courseId];
+  const course = COURSES[routeParam(req.params.courseId)];
   if (!course) {
     res.status(404).json({ error: "Course not found" });
     return;
@@ -188,7 +192,7 @@ router.post("/courses/:courseId/checkout", requireAuth, async (req, res): Promis
 // Update watch progress for a lesson. Marks complete at ≥90% watched.
 // ---------------------------------------------------------------------------
 router.post("/courses/:courseId/progress", requireAuth, async (req, res): Promise<void> => {
-  const course = COURSES[req.params.courseId];
+  const course = COURSES[routeParam(req.params.courseId)];
   if (!course) {
     res.status(404).json({ error: "Course not found" });
     return;
@@ -266,7 +270,7 @@ router.post("/courses/:courseId/progress", requireAuth, async (req, res): Promis
 // Get all lesson progress + summary stats for the authenticated user.
 // ---------------------------------------------------------------------------
 router.get("/courses/:courseId/progress", requireAuth, async (req, res): Promise<void> => {
-  const course = COURSES[req.params.courseId];
+  const course = COURSES[routeParam(req.params.courseId)];
   if (!course) {
     res.status(404).json({ error: "Course not found" });
     return;
