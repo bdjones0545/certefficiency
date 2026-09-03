@@ -316,11 +316,10 @@ router.post("/conversations/:id/messages", requireAuth, async (req, res): Promis
 
   // ── Optional: validate and resolve attachment IDs ────────────────────────
   const rawAttachmentIds: string[] | undefined = (() => {
-    const val = req.body?.attachmentIds;
+    // uploadIds remains a deprecated compatibility alias for older generated
+    // clients. New clients and all responses use attachmentIds consistently.
+    const val = parsed.data.attachmentIds ?? parsed.data.uploadIds;
     if (!val) return undefined;
-    if (!Array.isArray(val) || val.length > 5) return undefined;
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!val.every((v: unknown) => typeof v === "string" && UUID_RE.test(v))) return undefined;
     return val as string[];
   })();
 

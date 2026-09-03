@@ -1130,6 +1130,11 @@ components:
         status:
           type: string
           enum: [sending, delivered, failed]
+        attachmentIds:
+          type: [array, "null"]
+          items:
+            type: string
+            format: uuid
         createdAt:
           type: string
           format: date-time
@@ -1141,10 +1146,20 @@ components:
         content:
           type: string
           minLength: 1
-        uploadIds:
+        attachmentIds:
           type: array
+          maxItems: 5
           items:
             type: string
+            format: uuid
+        uploadIds:
+          deprecated: true
+          description: Deprecated alias for attachmentIds.
+          type: array
+          maxItems: 5
+          items:
+            type: string
+            format: uuid
 
     SendMessageResult:
       type: object

@@ -35,7 +35,7 @@ function devLog(event: string, data?: Record<string, unknown>) {
 // Types
 // ---------------------------------------------------------------------------
 
-type MessageWithAttachments = Message & { attachmentIds?: string[] | null };
+type MessageWithAttachments = Message;
 
 // ---------------------------------------------------------------------------
 // Chat bubble
@@ -395,7 +395,7 @@ export default function Home() {
         data: {
           content,
           ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
-        } as any,
+        },
       });
 
       // Extract and validate the job ID from the mutation result.

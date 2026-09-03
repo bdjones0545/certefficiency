@@ -9,5 +9,12 @@
 export interface MessageInput {
   /** @minLength 1 */
   content: string;
+  /** @maxItems 5 */
+  attachmentIds?: string[];
+  /**
+   * Deprecated alias for attachmentIds.
+   * @deprecated
+   * @maxItems 5
+   */
   uploadIds?: string[];
 }

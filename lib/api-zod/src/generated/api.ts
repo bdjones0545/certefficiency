@@ -395,9 +395,13 @@ export const SendMessageParams = zod.object({
 
 
 
+export const sendMessageBodyAttachmentIdsMax = 5;
+export const sendMessageBodyUploadIdsMax = 5;
+
 export const SendMessageBody = zod.object({
   "content": zod.string().min(1),
-  "uploadIds": zod.array(zod.string()).optional()
+  "attachmentIds": zod.array(zod.string().uuid()).max(sendMessageBodyAttachmentIdsMax).optional(),
+  "uploadIds": zod.array(zod.string().uuid()).max(sendMessageBodyUploadIdsMax).optional()
 })
 
 export const SendMessageResponse = zod.object({

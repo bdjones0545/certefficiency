@@ -266,12 +266,21 @@ export interface Message {
   /** @nullable */
   structuredData?: MessageStructuredData;
   status?: MessageStatus;
+  /** @nullable */
+  attachmentIds?: string[] | null;
   createdAt: string;
 }
 
 export interface MessageInput {
   /** @minLength 1 */
   content: string;
+  /** @maxItems 5 */
+  attachmentIds?: string[];
+  /**
+   * Deprecated alias for attachmentIds.
+   * @deprecated
+   * @maxItems 5
+   */
   uploadIds?: string[];
 }
 
@@ -699,4 +708,3 @@ export interface SarahJob {
   completedAt?: string | null;
   createdAt: string;
 }
-

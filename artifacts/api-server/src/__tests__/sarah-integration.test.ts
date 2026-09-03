@@ -655,27 +655,21 @@ describe("Sarah integration — Phase 21 requirements", () => {
     expect(mockDispatch).not.toHaveBeenCalled();
   });
 
-  // ── REQ 26: Non-UUID attachment IDs stripped silently ─────────────────────
+  // ── REQ 26: Non-UUID attachment IDs rejected ──────────────────────────────
 
-  it("REQ-26: malformed (non-UUID) attachment IDs are stripped, message proceeds", async () => {
-    dbCallQueue = [[makeConv()], []];
-    mockInsertValues.mockReturnValue({ returning: vi.fn(async () => [makeMessage()]) });
-
+  it("REQ-26: malformed attachment IDs are rejected by the public contract", async () => {
     const res = await request(app)
       .post(`/api/conversations/${CONV_ID}/messages`)
       .set("Authorization", `Bearer ${tok()}`)
       .send({ content: "Test", attachmentIds: ["../../etc/passwd"] });
 
-    // Non-UUID values are silently ignored; message proceeds without attachments
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 
-  // ── REQ 27: More than 5 attachment IDs silently capped ────────────────────
+  // ── REQ 27: More than 5 attachment IDs rejected ───────────────────────────
 
-  it("REQ-27: more than 5 attachment IDs are silently stripped", async () => {
-    dbCallQueue = [[makeConv()], []];
-    mockInsertValues.mockReturnValue({ returning: vi.fn(async () => [makeMessage()]) });
-
+  it("REQ-27: more than 5 attachment IDs are rejected", async () => {
     const makeUUID = (n: number) =>
       `${n.toString().padStart(8, "0")}-0000-0000-0000-000000000000`;
 
@@ -684,8 +678,28 @@ describe("Sarah integration — Phase 21 requirements", () => {
       .set("Authorization", `Bearer ${tok()}`)
       .send({ content: "Too many", attachmentIds: [1, 2, 3, 4, 5, 6].map(makeUUID) });
 
-    // 6 IDs exceeds limit of 5 → stripped, message still processes
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(400);
+    expect(mockDispatch).not.toHaveBeenCalled();
+  });
+
+  it("REQ-27b: deprecated uploadIds alias remains ownership checked", async () => {
+    dbCallQueue = [
+      [makeConv()],
+      [],
+      [],
+    ];
+
+    const res = await request(app)
+      .post(`/api/conversations/${CONV_ID}/messages`)
+      .set("Authorization", `Bearer ${tok()}`)
+      .send({
+        content: "Legacy client image",
+        uploadIds: ["ffffffff-ffff-ffff-ffff-ffffffffffff"],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not found|does not belong/i);
+    expect(mockDispatch).not.toHaveBeenCalled();
   });
 
   // ── REQ 28: Unauthenticated requests get 401, not 429 ────────────────────

@@ -19,5 +19,7 @@ export interface Message {
   /** @nullable */
   structuredData?: MessageStructuredData;
   status?: MessageStatus;
+  /** @nullable */
+  attachmentIds?: string[] | null;
   createdAt: Date;
 }
