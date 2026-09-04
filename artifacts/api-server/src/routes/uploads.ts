@@ -40,6 +40,39 @@ function durableUploadsEnabled(): boolean {
   return Boolean(process.env.PRIVATE_OBJECT_DIR?.trim());
 }
 
+/**
+ * Whether uploads can actually be stored in this environment.
+ *
+ * Production refuses to keep uploads on local disk, because an autoscale
+ * instance's filesystem does not survive a redeploy — a learner's candidate
+ * handbook would silently vanish. That is the right call, but until now the
+ * only signal was persistValidatedUpload throwing deep inside the request,
+ * which surfaced to the learner as a bare "Internal server error" and said
+ * nothing to anyone about the cause.
+ */
+export function uploadsStorageUnavailableReason(): string | null {
+  if (durableUploadsEnabled()) return null;
+  if (process.env.NODE_ENV !== "production") return null;
+  return "PRIVATE_OBJECT_DIR is not set, so uploads cannot be stored durably in production";
+}
+
+/**
+ * Refuses the request with an actionable 503 when storage is misconfigured,
+ * rather than letting it fail as an opaque 500 after the file is already read.
+ * Returns true when the request was handled and the caller must stop.
+ */
+function rejectIfStorageUnavailable(res: import("express").Response): boolean {
+  const reason = uploadsStorageUnavailableReason();
+  if (!reason) return false;
+  logger.error({ reason }, "uploads_storage_unavailable");
+  res.status(503).json({
+    error:
+      "File uploads are temporarily unavailable. This is a server configuration " +
+      "problem, not a problem with your file.",
+  });
+  return true;
+}
+
 function unlinkTemporaryFile(filePath: string): Promise<void> {
   return new Promise((resolve) => fs.unlink(filePath, () => resolve()));
 }
@@ -143,6 +176,7 @@ router.get("/uploads", requireAuth, async (req, res): Promise<void> => {
 // receives the image reference when the user sends a message.
 // ---------------------------------------------------------------------------
 router.post("/uploads/images", requireAuth, (req, res, next) => {
+  if (rejectIfStorageUnavailable(res)) return;
   uploadImage.single("image")(req, res, async (err) => {
     const reqLog = req.log;
 
@@ -222,6 +256,7 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
 // POST /uploads  (general — all allowed types, field: "file")
 // ---------------------------------------------------------------------------
 router.post("/uploads", requireAuth, (req, res, next) => {
+  if (rejectIfStorageUnavailable(res)) return;
   upload.single("file")(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") {
       res.status(400).json({ error: "File exceeds the 10 MB size limit." });
