@@ -13,6 +13,11 @@ import jwt from "jsonwebtoken";
 import { inspectUploadedFile, UploadInspectionError } from "../lib/uploadInspection";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
 import { extractUploadText } from "../lib/textExtraction";
+import {
+  UPLOAD_UNAVAILABLE_MESSAGE,
+  classifyStorageFailure,
+  privateObjectDirConfigured,
+} from "../lib/uploadStorageHealth";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -37,18 +42,17 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const objectStorage = new ObjectStorageService();
 
 function durableUploadsEnabled(): boolean {
-  return Boolean(process.env.PRIVATE_OBJECT_DIR?.trim());
+  return privateObjectDirConfigured();
 }
 
 /**
- * Whether uploads can actually be stored in this environment.
+ * Whether uploads are refused outright before the request body is read.
  *
- * Production refuses to keep uploads on local disk, because an autoscale
- * instance's filesystem does not survive a redeploy — a learner's candidate
- * handbook would silently vanish. That is the right call, but until now the
- * only signal was persistValidatedUpload throwing deep inside the request,
- * which surfaced to the learner as a bare "Internal server error" and said
- * nothing to anyone about the cause.
+ * This only catches the cheapest failure — the variable being absent. It does
+ * NOT prove storage works: authentication goes through a Replit sidecar that
+ * this check never contacts. Failures past this point are classified in the
+ * route's catch block instead, which is where the sidecar and the bucket write
+ * actually get exercised.
  */
 export function uploadsStorageUnavailableReason(): string | null {
   if (durableUploadsEnabled()) return null;
@@ -57,19 +61,40 @@ export function uploadsStorageUnavailableReason(): string | null {
 }
 
 /**
- * Refuses the request with an actionable 503 when storage is misconfigured,
- * rather than letting it fail as an opaque 500 after the file is already read.
- * Returns true when the request was handled and the caller must stop.
+ * Refuses the request with an actionable 503 when storage is plainly
+ * unconfigured, rather than letting it fail as an opaque 500 after the file has
+ * already been read off the wire.  Returns true when the caller must stop.
  */
 function rejectIfStorageUnavailable(res: import("express").Response): boolean {
   const reason = uploadsStorageUnavailableReason();
   if (!reason) return false;
-  logger.error({ reason }, "uploads_storage_unavailable");
+  logger.error(
+    { reason, code: "storage_not_configured" },
+    "uploads_storage_unavailable",
+  );
   res.status(503).json({
-    error:
-      "File uploads are temporarily unavailable. This is a server configuration " +
-      "problem, not a problem with your file.",
+    error: UPLOAD_UNAVAILABLE_MESSAGE,
+    code: "storage_not_configured",
   });
+  return true;
+}
+
+/**
+ * Turns a storage failure into a 503 carrying a coarse code, instead of the
+ * bare 500 that made this undiagnosable from outside the deployment.  The
+ * underlying message is logged, never returned.  Returns true when handled.
+ */
+function respondToStorageFailure(
+  res: import("express").Response,
+  err: unknown,
+  context: Record<string, unknown>,
+): boolean {
+  const problem = classifyStorageFailure(err);
+  logger.error(
+    { ...context, code: problem.code, detail: problem.detail },
+    "upload_storage_failed",
+  );
+  res.status(503).json({ error: UPLOAD_UNAVAILABLE_MESSAGE, code: problem.code });
   return true;
 }
 
@@ -247,6 +272,11 @@ router.post("/uploads/images", requireAuth, (req, res, next) => {
         res.status(400).json({ error: e.message });
         return;
       }
+      // Anything else here is a storage failure: inspection has passed and the
+      // only remaining work is persisting and recording the file.  Classify it
+      // so the cause is visible without deployment-console access, instead of
+      // falling through to a bare 500.
+      if (respondToStorageFailure(res, e, { userId: req.userId })) return;
       next(e);
     }
   });
@@ -342,6 +372,11 @@ router.post("/uploads", requireAuth, (req, res, next) => {
         res.status(400).json({ error: e.message });
         return;
       }
+      // Anything else here is a storage failure: inspection has passed and the
+      // only remaining work is persisting and recording the file.  Classify it
+      // so the cause is visible without deployment-console access, instead of
+      // falling through to a bare 500.
+      if (respondToStorageFailure(res, e, { userId: req.userId })) return;
       next(e);
     }
   });

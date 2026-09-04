@@ -141,27 +141,35 @@ if (validateR2Config()) {
 }
 
 // ---------------------------------------------------------------------------
-// Upload storage check — production refuses to keep uploads on local disk,
-// because an autoscale instance's filesystem does not survive a redeploy.
+// Upload storage check — actively probed, not merely configured.
 //
-// Warn loudly at boot rather than exiting: uploads being unavailable should not
-// take down chat, auth and payments with them. Without this the only symptom
-// was a bare 500 on every upload, with nothing naming the cause.
+// Production refuses to keep uploads on local disk, because an autoscale
+// instance's filesystem does not survive a redeploy.  But confirming
+// PRIVATE_OBJECT_DIR is a non-empty string proves nothing: storage
+// authenticates through a Replit sidecar, and the variable can be set while
+// that sidecar is unreachable.  So this contacts it.
+//
+// Warns rather than exiting: uploads being unavailable must not take chat, auth
+// and payments down with them.
 // ---------------------------------------------------------------------------
-import { uploadsStorageUnavailableReason } from "./routes/uploads.js";
-const _uploadsStorageIssue = uploadsStorageUnavailableReason();
-if (_uploadsStorageIssue) {
-  logger.error(
-    {
-      reason: _uploadsStorageIssue,
-      hint: "Set PRIVATE_OBJECT_DIR in the DEPLOYMENT's Secrets (not only the " +
-            "workspace's) to the private object-storage directory",
-    },
-    "uploads_storage_misconfigured — every upload will be refused with 503 until configured",
-  );
-} else {
-  logger.info("uploads_storage_ok");
-}
+import { probeUploadStorage } from "./lib/uploadStorageHealth.js";
+void probeUploadStorage().then((problem) => {
+  if (problem) {
+    logger.error(
+      {
+        code: problem.code,
+        detail: problem.detail,
+        hint:
+          problem.code === "storage_not_configured"
+            ? "Set PRIVATE_OBJECT_DIR in the DEPLOYMENT's Secrets (not only the workspace's)"
+            : "Object Storage is provisioned but its credential sidecar did not answer",
+      },
+      "uploads_storage_unavailable_at_boot — uploads will be refused with 503 until resolved",
+    );
+  } else {
+    logger.info("uploads_storage_ok");
+  }
+});
 
 app.listen(port, (err) => {
   if (err) {
