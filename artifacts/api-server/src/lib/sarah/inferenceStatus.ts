@@ -100,6 +100,23 @@ export function isProviderError(content: string): boolean {
 }
 
 /**
+ * Returns true when the content is a raw upstream error envelope that must
+ * never be shown to a learner as if Sarah had written it.
+ *
+ * Observed in production on 2026-09-04, stored as a normal assistant message:
+ *   HTTP 403: {"code":"unauthenticated:bad-credentials","error":"The OAuth …
+ *
+ * Deliberately stricter than isProviderError, which matches any content
+ * starting with "HTTP ". Sarah tutors Security+ candidates, so a genuine answer
+ * may legitimately open with "HTTP 403 means forbidden…" — suppressing that
+ * would delete real teaching. Requiring a JSON or array body immediately after
+ * the status code distinguishes a machine error envelope from prose about one.
+ */
+export function isRawProviderErrorEnvelope(content: string): boolean {
+  return /^HTTP \d{3}:\s*[{[]/.test(content.trimStart());
+}
+
+/**
  * Reset all state to the initial condition.
  * Exported for test isolation only — do not call in production code.
  */
