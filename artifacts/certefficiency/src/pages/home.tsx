@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useCallback } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { NavbarMobile } from "@/components/navbar-mobile";
-import { Composer, PendingImage } from "@/components/composer";
-import { AttachmentImage } from "@/components/attachment-image";
+import { Composer, PendingAttachment } from "@/components/composer";
+import { attachmentKindFor, extractAttachmentId, uploadTargetFor } from "@/lib/attachments";
+import { MessageAttachment } from "@/components/message-attachment";
 import {
   useGetConversation,
   useListMessages,
@@ -78,11 +79,11 @@ const ChatBubble = ({ message }: { message: MessageWithAttachments }) => {
           </Avatar>
         )}
         <div className="flex flex-col gap-2">
-          {/* Attached images (user messages only) */}
+          {/* Attachments — documents and images (user messages only) */}
           {isUser && message.attachmentIds?.length ? (
             <div className="flex flex-wrap gap-2 justify-end">
               {message.attachmentIds.map((id) => (
-                <AttachmentImage key={id} uploadId={id} />
+                <MessageAttachment key={id} uploadId={id} />
               ))}
             </div>
           ) : null}
@@ -196,7 +197,7 @@ export default function Home() {
   const [sarahInitPending, setSarahInitPending] = React.useState(false);
 
   // ── Pending image uploads ─────────────────────────────────────────────────
-  const [pendingImages, setPendingImages] = React.useState<PendingImage[]>([]);
+  const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>([]);
 
   // isValidJobId guards the polling hook.
   // A non-string or non-UUID value must never reach getGetSarahJobUrl() — it
@@ -227,8 +228,8 @@ export default function Home() {
     setActiveJobId(null);
     setSendError(null);
     setSarahInitPending(false);
-    setPendingImages((prev) => {
-      prev.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+    setPendingAttachments((prev) => {
+      prev.forEach((att) => att.previewUrl && URL.revokeObjectURL(att.previewUrl));
       return [];
     });
   }, [conversationId]);
@@ -236,8 +237,8 @@ export default function Home() {
   // Cleanup blob URLs on unmount
   useEffect(() => {
     return () => {
-      setPendingImages((prev) => {
-        prev.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+      setPendingAttachments((prev) => {
+        prev.forEach((att) => att.previewUrl && URL.revokeObjectURL(att.previewUrl));
         return prev;
       });
     };
@@ -268,15 +269,25 @@ export default function Home() {
     }
   }, [job?.status, conversationId, queryClient, activeJobId]);
 
-  // ── Image file selected from picker ──────────────────────────────────────
-  const handleImageFile = useCallback(async (file: File) => {
+  // ── File selected from picker (image or document) ────────────────────────
+  //
+  // The two upload endpoints differ in more than their path: /uploads/images
+  // takes the field "image" and replies { attachment: { id } }, while the
+  // general /uploads takes "file" and replies with the upload record itself.
+  // Both shapes are normalised here so the caller only ever sees an id.
+  const handleFileSelected = useCallback(async (file: File) => {
     const localId = crypto.randomUUID();
-    const previewUrl = URL.createObjectURL(file);
+    const kind = attachmentKindFor(file);
+    // Only images have something to preview; creating a blob URL for a PDF
+    // would allocate an object URL that nothing renders and nothing revokes.
+    const previewUrl = kind === "image" ? URL.createObjectURL(file) : undefined;
 
-    devLog("image_upload_clicked", { filename: file.name, mimeType: file.type, sizeBytes: file.size });
+    devLog("attachment_upload_started", {
+      filename: file.name, kind, mimeType: file.type, sizeBytes: file.size,
+    });
 
-    const pending: PendingImage = { localId, file, previewUrl, status: "uploading" };
-    setPendingImages((prev) => [...prev, pending]);
+    const pending: PendingAttachment = { localId, file, kind, previewUrl, status: "uploading" };
+    setPendingAttachments((prev) => [...prev, pending]);
 
     try {
       const token =
@@ -284,10 +295,11 @@ export default function Home() {
           ? localStorage.getItem("certefficiency_token")
           : null;
 
+      const target = uploadTargetFor(kind);
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append(target.field, file);
 
-      const res = await fetch("/api/uploads/images", {
+      const res = await fetch(target.url, {
         method: "POST",
         body: formData,
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -302,32 +314,33 @@ export default function Home() {
         throw new Error(errMsg);
       }
 
-      const data = await res.json();
-      const attachmentId: string | undefined = data?.attachment?.id;
+      const attachmentId = extractAttachmentId(await res.json());
       if (!attachmentId) throw new Error("Server returned an invalid upload response.");
 
-      setPendingImages((prev) =>
-        prev.map((img) =>
-          img.localId === localId
-            ? { ...img, status: "uploaded", attachmentId }
-            : img
+      devLog("attachment_upload_succeeded", { filename: file.name, kind, attachmentId });
+
+      setPendingAttachments((prev) =>
+        prev.map((att) =>
+          att.localId === localId
+            ? { ...att, status: "uploaded", attachmentId }
+            : att
         )
       );
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "Upload failed. Please try again.";
-      setPendingImages((prev) =>
-        prev.map((img) =>
-          img.localId === localId ? { ...img, status: "failed", error: errMsg } : img
+      setPendingAttachments((prev) =>
+        prev.map((att) =>
+          att.localId === localId ? { ...att, status: "failed", error: errMsg } : att
         )
       );
     }
   }, []);
 
-  const handleRemoveImage = useCallback((localId: string) => {
-    setPendingImages((prev) => {
-      const removed = prev.find((img) => img.localId === localId);
-      if (removed) URL.revokeObjectURL(removed.previewUrl);
-      return prev.filter((img) => img.localId !== localId);
+  const handleRemoveAttachment = useCallback((localId: string) => {
+    setPendingAttachments((prev) => {
+      const removed = prev.find((att) => att.localId === localId);
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((att) => att.localId !== localId);
     });
   }, []);
 
@@ -418,9 +431,9 @@ export default function Home() {
         setSendError("Sarah couldn't confirm your message was received. Please try again.");
       }
 
-      // Clear uploaded images — send succeeded
-      setPendingImages((prev) => {
-        prev.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+      // Clear uploaded attachments — send succeeded
+      setPendingAttachments((prev) => {
+        prev.forEach((att) => att.previewUrl && URL.revokeObjectURL(att.previewUrl));
         return [];
       });
 
@@ -504,9 +517,9 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background via-background/95 to-transparent pt-6">
           <Composer
             onSend={handleSend}
-            onImageFile={handleImageFile}
-            pendingImages={pendingImages}
-            onRemoveImage={handleRemoveImage}
+            onFileSelected={handleFileSelected}
+            pendingAttachments={pendingAttachments}
+            onRemoveAttachment={handleRemoveAttachment}
             disabled={composerDisabled}
           />
         </div>
