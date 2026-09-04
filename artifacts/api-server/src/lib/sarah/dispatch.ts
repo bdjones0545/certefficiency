@@ -26,6 +26,7 @@ import {
   recordInferenceFailure,
   isBillingError,
   isProviderError,
+  isRawProviderErrorEnvelope,
 } from "./inferenceStatus";
 import { buildSarahRecentMessages } from "./contextGuidance";
 import { buildExcerpt } from "../textExtraction";
@@ -318,12 +319,25 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
     // So a degraded response is stored as an `error` message instead: the UI
     // renders those distinctly, and POST /messages/:id/retry lets the learner
     // try again.  An honest failure they can retry beats a convincing non-answer.
-    if (result.degraded) {
+    // A raw upstream error envelope reaches us with degraded = false, because
+    // Sarah's runtime reported success and put the provider's error text in the
+    // message body.  Observed in production 2026-09-04: a learner asked a
+    // question and was shown
+    //   HTTP 403: {"code":"unauthenticated:bad-credentials", ...}
+    // as though Sarah had written it.  isProviderError already detected this and
+    // recorded the failure — it simply never gated what the learner saw.
+    const rawErrorEnvelope = result.responseMessages.some((m) =>
+      isRawProviderErrorEnvelope(m.content),
+    );
+
+    if (result.degraded || rawErrorEnvelope) {
       const supportRef = input.jobId.slice(-8);
 
       recordInferenceFailure(
         "provider_error",
-        "Sarah returned a degraded response (runtime reported provider failure or timeout)",
+        rawErrorEnvelope
+          ? "Sarah returned a raw upstream error envelope as message content"
+          : "Sarah returned a degraded response (runtime reported provider failure or timeout)",
       );
 
       await db.insert(messagesTable).values({
@@ -356,7 +370,11 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
         .where(eq(sarahJobsTable.id, input.jobId));
 
       log.warn(
-        { conversationId: input.conversationId, elapsedMs: Date.now() - startMs },
+        {
+          conversationId: input.conversationId,
+          elapsedMs: Date.now() - startMs,
+          trigger: rawErrorEnvelope ? "raw_error_envelope" : "degraded_flag",
+        },
         "sarah.response.degraded_suppressed",
       );
       return;

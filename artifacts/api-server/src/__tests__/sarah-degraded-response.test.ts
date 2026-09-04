@@ -386,3 +386,61 @@ describe("opening greeting race", () => {
     expect(updatedSets.filter((u) => u.__table === "conversations")).toHaveLength(0);
   });
 });
+
+// ── A raw upstream error envelope is not tutoring either ─────────────────────
+
+describe("raw provider error envelopes reaching dispatch", () => {
+  const OBSERVED =
+    'HTTP 403: {"code":"unauthenticated:bad-credentials","error":"The OAuth token is invalid"}';
+
+  it("RAWD-1: an envelope with degraded=false is still stored as an error", async () => {
+    const { dispatchSarahMessage } = await import("../lib/sarah/dispatch.js");
+    // Sarah's runtime reported success and put the provider error in the body,
+    // which is exactly how this reached a learner in production.
+    mockSendMessage.mockResolvedValue({
+      responseMessages: [{ messageType: "text", content: OBSERVED, structuredData: null }],
+      jobCompleted: true,
+      degraded: false,
+    });
+
+    await dispatchSarahMessage(dispatchInput());
+
+    const assistant = assistantInserts();
+    expect(assistant).toHaveLength(1);
+    expect(assistant[0].messageType).toBe("error");
+  });
+
+  it("RAWD-2: the learner never sees the provider's error text", async () => {
+    const { dispatchSarahMessage } = await import("../lib/sarah/dispatch.js");
+    mockSendMessage.mockResolvedValue({
+      responseMessages: [{ messageType: "text", content: OBSERVED, structuredData: null }],
+      jobCompleted: true,
+      degraded: false,
+    });
+
+    await dispatchSarahMessage(dispatchInput());
+
+    const content = String(assistantInserts()[0]?.content ?? "");
+    expect(content).not.toContain("bad-credentials");
+    expect(content).not.toContain("OAuth");
+    expect(content).not.toContain("HTTP 403");
+    expect(content).toContain("could not reach her reasoning engine");
+  });
+
+  it("RAWD-3: a real answer about HTTP status codes is delivered untouched", async () => {
+    const { dispatchSarahMessage } = await import("../lib/sarah/dispatch.js");
+    const teaching =
+      "HTTP 401 versus HTTP 403 is a classic Security+ distractor: 401 is unauthenticated, 403 is unauthorized.";
+    mockSendMessage.mockResolvedValue({
+      responseMessages: [{ messageType: "text", content: teaching, structuredData: null }],
+      jobCompleted: true,
+      degraded: false,
+    });
+
+    await dispatchSarahMessage(dispatchInput());
+
+    const assistant = assistantInserts();
+    expect(assistant[0].messageType).toBe("text");
+    expect(assistant[0].content).toBe(teaching);
+  });
+});
