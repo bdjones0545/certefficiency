@@ -16,6 +16,11 @@ export const uploadsTable = pgTable("uploads", {
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
   storagePath: text("storage_path"),
+  // Text pulled out of the file at upload time (PDF, DOCX, TXT, Markdown).
+  // Null means it was never extractable, yielded nothing, or parsing failed —
+  // Sarah cannot read files herself, so an upload with no text here is a file
+  // she will never be able to reason about.
+  extractedText: text("extracted_text"),
   status: uploadStatusEnum("status").notNull().default("processing"),
   sarahJobId: uuid("sarah_job_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

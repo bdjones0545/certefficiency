@@ -12,6 +12,7 @@ import { generateSignedUploadUrl, getPublicBaseUrl, verifySignedToken } from "..
 import jwt from "jsonwebtoken";
 import { inspectUploadedFile, UploadInspectionError } from "../lib/uploadInspection";
 import { ObjectNotFoundError, ObjectStorageService } from "../lib/objectStorage";
+import { extractUploadText } from "../lib/textExtraction";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -261,6 +262,14 @@ router.post("/uploads", requireAuth, (req, res, next) => {
         }
       }
 
+      // Extract before persisting: persistValidatedUpload moves the file to
+      // object storage and unlinks the temporary copy, so this is the last
+      // point at which the bytes are cheaply readable from local disk.
+      // Never fatal — a handbook we cannot parse should still upload.
+      const extraction = await extractUploadText(file.path, file.mimetype, {
+        userId: req.userId!,
+      });
+
       persistedStoragePath = await persistValidatedUpload(file);
 
       const [record] = await db.insert(uploadsTable).values({
@@ -271,10 +280,26 @@ router.post("/uploads", requireAuth, (req, res, next) => {
         mimeType: file.mimetype,
         sizeBytes: file.size,
         storagePath: persistedStoragePath,
+        extractedText: extraction.text,
         status: "processing",
       }).returning();
 
-      res.status(201).json(record);
+      logger.info(
+        {
+          userId: req.userId,
+          uploadId: record?.id,
+          mimeType: file.mimetype,
+          extractionStatus: extraction.status,
+          extractedChars: extraction.text?.length ?? 0,
+        },
+        "upload_stored",
+      );
+
+      // extractedText can run to 200k characters and is only ever consumed
+      // server-side, so it is stripped from the response. Setting it undefined
+      // rather than destructuring keeps the previous tolerance for a missing
+      // row — JSON.stringify omits undefined values.
+      res.status(201).json(record ? { ...record, extractedText: undefined } : record);
     } catch (e) {
       if (persistedStoragePath) await deleteStoredUpload(persistedStoragePath).catch(() => undefined);
       else await unlinkTemporaryFile(file.path);

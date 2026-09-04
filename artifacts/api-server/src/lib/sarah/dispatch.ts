@@ -28,6 +28,7 @@ import {
   isProviderError,
 } from "./inferenceStatus";
 import { buildSarahRecentMessages } from "./contextGuidance";
+import { buildExcerpt } from "../textExtraction";
 
 // ---------------------------------------------------------------------------
 // Bounded job timeout
@@ -52,6 +53,8 @@ export interface AttachmentRef {
   mimeType: string;
   storagePath: string | null;
   status: string;
+  /** Text pulled from the file at upload time; null when none could be read. */
+  extractedText?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -254,6 +257,11 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
         type: a.mimeType.startsWith("image/") ? "image" : "document",
         mimeType: a.mimeType,
         url,
+        // The signed URL alone is useless to Sarah: she has no file reader.
+        // The excerpt is the only way an uploaded document reaches the model.
+        ...(a.extractedText
+          ? { textExcerpt: buildExcerpt(a.extractedText) }
+          : {}),
       };
     });
 

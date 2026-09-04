@@ -9,6 +9,12 @@ export interface SarahContext {
     type?: string;
     mimeType?: string;
     url?: string;
+    /**
+     * Text extracted from the file at upload time.  Sarah cannot read files —
+     * her upload endpoint says so outright ("I won't invent contents of files I
+     * cannot read") — so without this an attached handbook is invisible to her.
+     */
+    textExcerpt?: string;
   }>;
 }
 
