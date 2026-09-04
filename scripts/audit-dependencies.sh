@@ -22,7 +22,12 @@
 set -uo pipefail
 
 AUDIT_LEVEL="${AUDIT_LEVEL:-high}"
-MAX_ATTEMPTS="${MAX_ATTEMPTS:-3}"
+# Two, not three, on purpose. pnpm runs its OWN retry loop against the advisory
+# service before returning — measured at ~4m30s per invocation during the
+# 2026-09-04 outage. Three attempts would be ~13.5 minutes against the job's
+# timeout, so the script would be killed during precisely the outage it exists
+# to handle. Two leaves real margin.
+MAX_ATTEMPTS="${MAX_ATTEMPTS:-2}"
 RETRY_DELAY_SECONDS="${RETRY_DELAY_SECONDS:-15}"
 
 # Signatures of the advisory service being unreachable, rather than of findings.

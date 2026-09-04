@@ -111,7 +111,9 @@ jobs:
   dependency-audit:
     name: Dependency audit
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Generous because pnpm's own retry loop against the advisory service runs
+    # for ~4m30s per invocation before returning, and the script may retry once.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
