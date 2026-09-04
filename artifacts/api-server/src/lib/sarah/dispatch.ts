@@ -5,8 +5,18 @@
  * the identical dispatch logic — no drift between paths.
  */
 
-import { db, conversationsTable, messagesTable, sarahJobsTable, uploadsTable } from "@workspace/db";
-import { eq, desc, inArray, sql } from "drizzle-orm";
+import {
+  db,
+  conversationsTable,
+  messagesTable,
+  sarahJobsTable,
+  uploadsTable,
+  topicMasteryTable,
+  practiceAttemptsTable,
+  practiceQuestionsTable,
+  studyPlansTable,
+} from "@workspace/db";
+import { and, eq, desc, inArray, sql } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { sarah } from "./index";
 import { logger } from "../logger";
@@ -97,6 +107,93 @@ function safeErrorCode(errorMsg: string, httpStatus: number | undefined): string
   return "unknown";
 }
 
+/**
+ * Loads the learner state Sarah needs to behave like a tutor who remembers.
+ *
+ * These three fields have existed on SarahContext since the contract was
+ * written, and were sent as `[] / [] / null` on every dispatch — so Sarah could
+ * never know which domains a learner is weak in, what they got wrong, or what
+ * plan she had already given them.  The underlying tables are real and
+ * maintained: practice.ts updates topic mastery on every answered question.
+ *
+ * Best-effort by design.  A learner with no practice history and no plan simply
+ * yields empty values, and a query failure must never cost the learner their
+ * reply — Sarah is still useful without this context, just not continuous.
+ */
+async function loadLearnerContext(
+  userId: string,
+  certificationId: string | null,
+): Promise<{
+  topicMastery: Array<{ domain: string; masteryScore: number }>;
+  recentAnswers: Array<{ correct: boolean; domain: string }>;
+  studyPlan: unknown | null;
+}> {
+  const empty = { topicMastery: [], recentAnswers: [], studyPlan: null };
+  if (!certificationId) return empty;
+
+  try {
+    const [topicMastery, recentAnswers, studyPlan] = await Promise.all([
+      db.select({
+        domain: topicMasteryTable.domain,
+        masteryScore: topicMasteryTable.masteryScore,
+      })
+        .from(topicMasteryTable)
+        .where(and(
+          eq(topicMasteryTable.userId, userId),
+          eq(topicMasteryTable.certificationId, certificationId),
+        )),
+
+      // Weakest-signal-first is the point: Sarah should revisit what was missed,
+      // so the domain has to travel with the attempt (it lives on the question).
+      db.select({
+        correct: practiceAttemptsTable.correct,
+        domain: practiceQuestionsTable.domain,
+      })
+        .from(practiceAttemptsTable)
+        .innerJoin(
+          practiceQuestionsTable,
+          eq(practiceAttemptsTable.questionId, practiceQuestionsTable.id),
+        )
+        .where(and(
+          eq(practiceAttemptsTable.userId, userId),
+          eq(practiceQuestionsTable.certificationId, certificationId),
+        ))
+        .orderBy(desc(practiceAttemptsTable.createdAt))
+        .limit(20),
+
+      db.select({
+        examDate: studyPlansTable.examDate,
+        weeklyHoursAvailable: studyPlansTable.weeklyHoursAvailable,
+        weakDomains: studyPlansTable.weakDomains,
+        strongDomains: studyPlansTable.strongDomains,
+        milestones: studyPlansTable.milestones,
+        updatedAt: studyPlansTable.updatedAt,
+      })
+        .from(studyPlansTable)
+        .where(and(
+          eq(studyPlansTable.userId, userId),
+          eq(studyPlansTable.certificationId, certificationId),
+          eq(studyPlansTable.status, "active"),
+        ))
+        .orderBy(desc(studyPlansTable.updatedAt))
+        .limit(1),
+    ]);
+
+    return {
+      topicMastery,
+      // Oldest-to-newest reads as a progression rather than a stack.
+      recentAnswers: recentAnswers.reverse(),
+      studyPlan: studyPlan[0] ?? null,
+    };
+  } catch (err) {
+    logger.warn(
+      { err, userId, certificationId },
+      "sarah_learner_context_load_failed",
+    );
+    return empty;
+  }
+}
+
 export async function dispatchSarahMessage(input: DispatchMessageInput): Promise<void> {
   const log = logger.child({ jobId: input.jobId, correlationId: input.correlationId });
   const startMs = Date.now();
@@ -159,6 +256,18 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
 
     log.info({ attachmentCount: uploadedResources.length }, "sarah_image_dispatch_started");
 
+    const learnerContext = await loadLearnerContext(input.userId, input.certificationId);
+
+    log.info(
+      {
+        conversationId: input.conversationId,
+        topicMasteryCount: learnerContext.topicMastery.length,
+        recentAnswerCount: learnerContext.recentAnswers.length,
+        hasStudyPlan: learnerContext.studyPlan !== null,
+      },
+      "sarah_learner_context_loaded",
+    );
+
     const result = await sarah.sendMessage({
       requestId: input.jobId,
       userId: input.userId,
@@ -170,9 +279,7 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
       message: { id: input.messageId, content: input.content },
       context: {
         recentMessages: buildSarahRecentMessages(input.recentMessages),
-        topicMastery: [],
-        recentAnswers: [],
-        studyPlan: null,
+        ...learnerContext,
         uploadedResources,
       },
     });
@@ -185,6 +292,61 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
       },
       "sarah.dispatch.completed",
     );
+
+    // ── Degraded responses are never presented as teaching ────────────────────
+    // When Sarah's own runtime fails (LLM provider error, or a timeout) her API
+    // still answers HTTP 200, carrying a deterministic canned reply and
+    // metadata.degraded = true.  That canned reply reads like tutoring but
+    // teaches nothing — it announces what it will explain and then asks the
+    // learner what to study.  Persisting it as a normal assistant turn tells the
+    // learner their tutor answered when it did not.
+    //
+    // So a degraded response is stored as an `error` message instead: the UI
+    // renders those distinctly, and POST /messages/:id/retry lets the learner
+    // try again.  An honest failure they can retry beats a convincing non-answer.
+    if (result.degraded) {
+      const supportRef = input.jobId.slice(-8);
+
+      recordInferenceFailure(
+        "provider_error",
+        "Sarah returned a degraded response (runtime reported provider failure or timeout)",
+      );
+
+      await db.insert(messagesTable).values({
+        conversationId: input.conversationId,
+        role: "assistant",
+        messageType: "error",
+        content:
+          "Sarah could not reach her reasoning engine for that message, so there is no answer to give you yet. " +
+          `Please try again. (ref: ${supportRef})`,
+        structuredData: result.responseMessages[0]?.structuredData as any,
+        status: "delivered",
+        sarahJobId: input.jobId,
+      });
+
+      await db.update(conversationsTable)
+        .set({
+          messageCount: sql`${conversationsTable.messageCount} + 1`,
+          lastMessageAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(conversationsTable.id, input.conversationId));
+
+      await db.update(sarahJobsTable)
+        .set({
+          status: "completed",
+          completedAt: new Date(),
+          errorMessage: "degraded_response",
+          outputPayload: result as any,
+        })
+        .where(eq(sarahJobsTable.id, input.jobId));
+
+      log.warn(
+        { conversationId: input.conversationId, elapsedMs: Date.now() - startMs },
+        "sarah.response.degraded_suppressed",
+      );
+      return;
+    }
 
     // ── Inference status tracking ─────────────────────────────────────────────
     // Hermes wraps LLM provider errors in HTTP 200 responses, so we inspect
@@ -293,6 +455,15 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
 // Called in the background after a conversation row is persisted.
 // Errors are non-fatal — the conversation is usable even if the opening
 // message fails.
+//
+// The opening message is a greeting that asks the learner what they are
+// studying.  Because this runs in the background it races the learner's first
+// message: a learner who types immediately gets their answer stored first, and
+// the greeting then lands *underneath* it asking for facts they just supplied.
+// So the insert is conditional — the greeting is only stored while the
+// conversation is still empty, and the check and the insert share one
+// transaction.  When the learner got there first their message IS the opening,
+// and Sarah answers it on the normal dispatch path.
 // ---------------------------------------------------------------------------
 export async function initSarahConversation(input: {
   userId: string;
@@ -319,20 +490,37 @@ export async function initSarahConversation(input: {
       mode: input.mode,
     });
 
-    await db.insert(messagesTable).values({
-      conversationId: input.conversationId,
-      role: "assistant",
-      messageType: openingResult.openingMessage.messageType as any,
-      content: openingResult.openingMessage.content,
-      structuredData: openingResult.openingMessage.structuredData as any,
-      status: "delivered",
+    const stored = await db.transaction(async (tx) => {
+      const [firstMessage] = await tx.select({ id: messagesTable.id })
+        .from(messagesTable)
+        .where(eq(messagesTable.conversationId, input.conversationId))
+        .limit(1);
+
+      // The learner already spoke — their message is the opening.  Storing a
+      // greeting now would appear below it and ask what they just answered.
+      if (firstMessage) return false;
+
+      await tx.insert(messagesTable).values({
+        conversationId: input.conversationId,
+        role: "assistant",
+        messageType: openingResult.openingMessage.messageType as any,
+        content: openingResult.openingMessage.content,
+        structuredData: openingResult.openingMessage.structuredData as any,
+        status: "delivered",
+      });
+
+      await tx.update(conversationsTable)
+        .set({ messageCount: sql`${conversationsTable.messageCount} + 1`, lastMessageAt: new Date() })
+        .where(eq(conversationsTable.id, input.conversationId));
+
+      return true;
     });
 
-    await db.update(conversationsTable)
-      .set({ messageCount: sql`${conversationsTable.messageCount} + 1`, lastMessageAt: new Date() })
-      .where(eq(conversationsTable.id, input.conversationId));
-
-    log.info("sarah_initialization_completed");
+    if (stored) {
+      log.info("sarah_initialization_completed");
+    } else {
+      log.info("sarah_initialization_skipped_learner_first");
+    }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     log.warn({ errorMsg }, "sarah_initialization_failed");
