@@ -244,17 +244,23 @@ export async function dispatchSarahMessage(input: DispatchMessageInput): Promise
     const signingSecret = process.env.SESSION_SECRET || "";
     const uploadedResources = (input.attachments ?? []).map((a) => {
       const url = generateSignedUploadUrl(a.id, publicBase, signingSecret);
-      log.info({ attachmentId: a.id }, "sarah_attachment_url_created");
+      log.info({ attachmentId: a.id, mimeType: a.mimeType }, "sarah_attachment_url_created");
       return {
         id: a.id,
         filename: a.originalFilename,
-        type: "image",
+        // Derived, not hardcoded: this was pinned to "image" back when the
+        // picker only accepted images.  A candidate handbook announced to Sarah
+        // as an image is a resource she cannot reason about correctly.
+        type: a.mimeType.startsWith("image/") ? "image" : "document",
         mimeType: a.mimeType,
         url,
       };
     });
 
-    log.info({ attachmentCount: uploadedResources.length }, "sarah_image_dispatch_started");
+    log.info(
+      { attachmentCount: uploadedResources.length },
+      "sarah_attachment_dispatch_started",
+    );
 
     const learnerContext = await loadLearnerContext(input.userId, input.certificationId);
 

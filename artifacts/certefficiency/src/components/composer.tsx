@@ -1,18 +1,28 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Send, Image as ImageIcon, X, AlertCircle, Loader2 } from "lucide-react";
+import { Send, Paperclip, FileText, X, AlertCircle, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
+import {
+  AttachmentKind,
+  FILE_PICKER_ACCEPT,
+  MAX_UPLOAD_BYTES,
+  UNSUPPORTED_FORMAT_MESSAGE,
+  formatBytes,
+  isAcceptedFile,
+} from "@/lib/attachments";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type PendingImageStatus = "selected" | "uploading" | "uploaded" | "failed";
+export type PendingAttachmentStatus = "selected" | "uploading" | "uploaded" | "failed";
 
-export interface PendingImage {
+export interface PendingAttachment {
   localId: string;
   file: File;
-  previewUrl: string;     // blob URL — caller must revoke on removal / unmount
-  status: PendingImageStatus;
+  kind: AttachmentKind;
+  /** Blob URL for image previews only — caller must revoke on removal/unmount. */
+  previewUrl?: string;
+  status: PendingAttachmentStatus;
   attachmentId?: string;  // set once upload succeeds
   error?: string;
 }
@@ -24,18 +34,15 @@ interface ComposerProps {
    * If the Promise rejects, text is preserved so the user can retry.
    */
   onSend: (text: string, attachmentIds: string[]) => Promise<void>;
-  /** Called when the user selects a file from the picker. */
-  onImageFile: (file: File) => void;
-  /** Current list of pending images managed by the parent. */
-  pendingImages: PendingImage[];
-  /** Called when the user removes a pending image from the preview strip. */
-  onRemoveImage: (localId: string) => void;
+  /** Called when the user picks a file (image or document). */
+  onFileSelected: (file: File) => void;
+  /** Current list of pending attachments managed by the parent. */
+  pendingAttachments: PendingAttachment[];
+  /** Called when the user removes a pending attachment from the preview strip. */
+  onRemoveAttachment: (localId: string) => void;
   /** Disables the whole composer (Sarah is generating a response). */
   disabled?: boolean;
 }
-
-const ACCEPTED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 // ---------------------------------------------------------------------------
 // Component
@@ -43,16 +50,16 @@ const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 
 export const Composer: React.FC<ComposerProps> = ({
   onSend,
-  onImageFile,
-  pendingImages,
-  onRemoveImage,
+  onFileSelected,
+  pendingAttachments,
+  onRemoveAttachment,
   disabled = false,
 }) => {
   const [text, setText] = useState("");
   const [pickError, setPickError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -62,12 +69,12 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   }, [text]);
 
-  const uploadedIds = pendingImages
+  const uploadedIds = pendingAttachments
     .filter((p) => p.status === "uploaded" && p.attachmentId)
     .map((p) => p.attachmentId!);
 
-  const isUploading = pendingImages.some((p) => p.status === "uploading");
-  const hasFailedUpload = pendingImages.some((p) => p.status === "failed");
+  const isUploading = pendingAttachments.some((p) => p.status === "uploading");
+  const hasFailedUpload = pendingAttachments.some((p) => p.status === "failed");
 
   const canSend =
     !disabled &&
@@ -99,93 +106,134 @@ export const Composer: React.FC<ComposerProps> = ({
     }
   };
 
-  const handleImageButtonClick = () => {
+  const handleAttachButtonClick = () => {
     setPickError(null);
-    imageInputRef.current?.click();
+    fileInputRef.current?.click();
   };
 
-  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
 
     if (!file) return;
 
-    if (!ACCEPTED_MIME.includes(file.type)) {
-      setPickError("Unsupported format. Accepted: JPEG, PNG, WebP, GIF.");
+    if (!isAcceptedFile(file)) {
+      setPickError(UNSUPPORTED_FORMAT_MESSAGE);
       return;
     }
     if (file.size === 0) {
       setPickError("The selected file is empty.");
       return;
     }
-    if (file.size > MAX_BYTES) {
-      setPickError(`File is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max 10 MB.`);
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setPickError(`File is too large (${formatBytes(file.size)}). Max 10 MB.`);
       return;
     }
 
     setPickError(null);
-    onImageFile(file);
+    onFileSelected(file);
   };
 
   return (
     <div className="px-4 py-4 w-full max-w-4xl mx-auto glass pb-safe">
-      {/* ── Image preview strip ──────────────────────────────────────── */}
-      {pendingImages.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3" aria-label="Selected images">
-          {pendingImages.map((img) => (
-            <div
-              key={img.localId}
-              className="relative group w-20 h-20 rounded-xl overflow-hidden border border-border bg-muted shrink-0"
-            >
-              <img
-                src={img.previewUrl}
-                alt={img.file.name}
-                width={80}
-                height={80}
-                className="w-full h-full object-cover"
-              />
-              {img.status === "uploading" && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <Loader2 className="w-5 h-5 text-white animate-spin" aria-hidden="true" />
-                  <span className="sr-only">Uploading {img.file.name}</span>
-                </div>
-              )}
-              {img.status === "failed" && (
-                <div className="absolute inset-0 bg-destructive/70 flex items-center justify-center">
-                  <AlertCircle className="w-5 h-5 text-white" aria-hidden="true" />
-                  <span className="sr-only">Upload failed for {img.file.name}</span>
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={() => onRemoveImage(img.localId)}
-                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
-                aria-label="Remove image"
+      {/* ── Attachment preview strip ─────────────────────────────────── */}
+      {pendingAttachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-3" aria-label="Selected attachments">
+          {pendingAttachments.map((att) =>
+            att.kind === "image" ? (
+              <div
+                key={att.localId}
+                className="relative group w-20 h-20 rounded-xl overflow-hidden border border-border bg-muted shrink-0"
               >
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
+                <img
+                  src={att.previewUrl}
+                  alt={att.file.name}
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-cover"
+                />
+                {att.status === "uploading" && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 text-white animate-spin" aria-hidden="true" />
+                    <span className="sr-only">Uploading {att.file.name}</span>
+                  </div>
+                )}
+                {att.status === "failed" && (
+                  <div className="absolute inset-0 bg-destructive/70 flex items-center justify-center">
+                    <AlertCircle className="w-5 h-5 text-white" aria-hidden="true" />
+                    <span className="sr-only">Upload failed for {att.file.name}</span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(att.localId)}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                  aria-label={`Remove ${att.file.name}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              // Documents have no visual preview — name and size are what the
+              // learner needs to confirm they picked the right handbook.
+              <div
+                key={att.localId}
+                className={`relative group flex items-center gap-2 max-w-[15rem] h-20 px-3 rounded-xl border shrink-0 ${
+                  att.status === "failed"
+                    ? "border-destructive/40 bg-destructive/10"
+                    : "border-border bg-muted"
+                }`}
+              >
+                {att.status === "uploading" ? (
+                  <Loader2 className="w-5 h-5 shrink-0 text-muted-foreground animate-spin" aria-hidden="true" />
+                ) : att.status === "failed" ? (
+                  <AlertCircle className="w-5 h-5 shrink-0 text-destructive" aria-hidden="true" />
+                ) : (
+                  <FileText className="w-5 h-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                )}
+                <div className="min-w-0">
+                  <div className="text-xs font-medium truncate" title={att.file.name}>
+                    {att.file.name}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {att.status === "uploading"
+                      ? "Uploading…"
+                      : att.status === "failed"
+                        ? "Upload failed"
+                        : formatBytes(att.file.size)}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onRemoveAttachment(att.localId)}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity focus:opacity-100"
+                  aria-label={`Remove ${att.file.name}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ),
+          )}
         </div>
       )}
 
       {/* ── Upload / pick errors ─────────────────────────────────────── */}
-      {(pickError || pendingImages.some((p) => p.error)) && (
+      {(pickError || pendingAttachments.some((p) => p.error)) && (
         <div role="alert" className="flex items-center gap-2 text-xs text-destructive bg-destructive/10 border border-destructive/20 px-3 py-2 rounded-lg mb-3">
           <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>{pickError ?? pendingImages.find((p) => p.error)?.error}</span>
+          <span>{pickError ?? pendingAttachments.find((p) => p.error)?.error}</span>
         </div>
       )}
 
       {/* ── Composer input row ───────────────────────────────────────── */}
       <div className="relative flex items-end gap-2 bg-card border border-border shadow-sm rounded-[24px] p-2 pr-2 pl-4 transition-shadow focus-within:ring-2 focus-within:ring-primary/20">
         <input
-          ref={imageInputRef}
+          ref={fileInputRef}
           type="file"
-          accept={ACCEPTED_MIME.join(",")}
+          accept={FILE_PICKER_ACCEPT}
           className="hidden"
-          onChange={handleImageSelected}
-          aria-label="Select image"
+          onChange={handleFilePicked}
+          aria-label="Select a file to attach"
         />
 
         <textarea
@@ -206,15 +254,15 @@ export const Composer: React.FC<ComposerProps> = ({
             variant="ghost"
             size="iconSm"
             className="rounded-full text-muted-foreground hover:bg-black/5"
-            onClick={handleImageButtonClick}
+            onClick={handleAttachButtonClick}
             disabled={disabled || isUploading || submitting}
-            title="Upload image"
-            aria-label={isUploading ? "Uploading image" : "Upload image"}
+            title="Attach a file — PDF, DOCX, TXT, Markdown or an image"
+            aria-label={isUploading ? "Uploading file" : "Attach a file"}
           >
             {isUploading ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
-              <ImageIcon className="w-5 h-5" />
+              <Paperclip className="w-5 h-5" />
             )}
           </Button>
 
