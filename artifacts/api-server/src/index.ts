@@ -140,6 +140,29 @@ if (validateR2Config()) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Upload storage check — production refuses to keep uploads on local disk,
+// because an autoscale instance's filesystem does not survive a redeploy.
+//
+// Warn loudly at boot rather than exiting: uploads being unavailable should not
+// take down chat, auth and payments with them. Without this the only symptom
+// was a bare 500 on every upload, with nothing naming the cause.
+// ---------------------------------------------------------------------------
+import { uploadsStorageUnavailableReason } from "./routes/uploads.js";
+const _uploadsStorageIssue = uploadsStorageUnavailableReason();
+if (_uploadsStorageIssue) {
+  logger.error(
+    {
+      reason: _uploadsStorageIssue,
+      hint: "Set PRIVATE_OBJECT_DIR in the DEPLOYMENT's Secrets (not only the " +
+            "workspace's) to the private object-storage directory",
+    },
+    "uploads_storage_misconfigured — every upload will be refused with 503 until configured",
+  );
+} else {
+  logger.info("uploads_storage_ok");
+}
+
 app.listen(port, (err) => {
   if (err) {
     logger.error({ err }, "Error listening on port");
